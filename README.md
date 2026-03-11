@@ -2,9 +2,9 @@
 
 A fast, configurable status line for [Claude Code](https://claude.ai/code), written in Rust.
 
-```
-󱚣 Opus 4.6  󰹰 ⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀  󰁫 34%   10m   …/my-project   …/my-project
-```
+<p align="center">
+  <img src=".github/social-preview.svg" alt="claude-bar presets preview" width="800">
+</p>
 
 ## Features
 

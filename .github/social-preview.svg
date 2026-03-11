@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1b26"/>
+      <stop offset="100%" stop-color="#13141c"/>
+    </linearGradient>
+    <linearGradient id="bar-bg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1e2030"/>
+      <stop offset="100%" stop-color="#232536"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-opacity="0.02" stroke-width="1"/>
+  </pattern>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+
+  <!-- Title -->
+  <text x="640" y="120" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="58" font-weight="700" fill="#c0caf5" letter-spacing="-1">claude-bar</text>
+
+  <!-- Subtitle -->
+  <text x="640" y="162" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="20" fill="#565f89">A fast, configurable status line for Claude Code</text>
+
+  <!-- ==================== MINIMAL PRESET (34% green) ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="120" y="200" width="1040" height="80" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <!-- Title bar -->
+    <rect x="120" y="200" width="1040" height="32" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="222" width="1040" height="10" fill="#1e1e2e"/>
+    <!-- Traffic lights -->
+    <circle cx="148" cy="216" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="216" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="216" r="5.5" fill="#28c840"/>
+    <!-- Terminal title -->
+    <text x="640" y="221" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#565f89">claude-bar --demo --preset minimal</text>
+  </g>
+  <!-- Status bar bg -->
+  <rect x="140" y="244" width="1000" height="26" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <!-- minimal: model, gauge (34% green), context -->
+  <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="15">
+    <text x="158" y="262" fill="#7aa2f7" filter="url(#glow)">Opus 4.6</text>
+    <text x="252" y="262" fill="#9ece6a" font-size="16">⣿⣿⣿⡆</text>
+    <text x="322" y="262" fill="#3b3d52" font-size="16">⠀⠀⠀⠀⠀⠀</text>
+    <text x="432" y="262" fill="#9ece6a">34%</text>
+  </g>
+
+  <!-- ==================== COMPACT PRESET (62% yellow) ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="120" y="310" width="1040" height="80" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <!-- Title bar -->
+    <rect x="120" y="310" width="1040" height="32" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="332" width="1040" height="10" fill="#1e1e2e"/>
+    <!-- Traffic lights -->
+    <circle cx="148" cy="326" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="326" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="326" r="5.5" fill="#28c840"/>
+    <!-- Terminal title -->
+    <text x="640" y="331" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#565f89">claude-bar --demo --preset compact</text>
+  </g>
+  <!-- Status bar bg -->
+  <rect x="140" y="354" width="1000" height="26" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <!-- compact: model, gauge (62% yellow), context, cost, cwd -->
+  <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="15">
+    <text x="158" y="372" fill="#7aa2f7" filter="url(#glow)">Opus 4.6</text>
+    <text x="252" y="372" fill="#e0af68" font-size="16">⣿⣿⣿⣿⣿⣿⡄</text>
+    <text x="382" y="372" fill="#3b3d52" font-size="16">⠀⠀⠀</text>
+    <text x="432" y="372" fill="#e0af68">62%</text>
+    <text x="486" y="372" fill="#565f89">$5.24</text>
+    <text x="552" y="372" fill="#565f89">…/my-project</text>
+  </g>
+
+  <!-- ==================== FULL PRESET (87% red) ==================== -->
+  <g filter="url(#shadow)">
+    <rect x="120" y="420" width="1040" height="80" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <!-- Title bar -->
+    <rect x="120" y="420" width="1040" height="32" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="442" width="1040" height="10" fill="#1e1e2e"/>
+    <!-- Traffic lights -->
+    <circle cx="148" cy="436" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="436" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="436" r="5.5" fill="#28c840"/>
+    <!-- Terminal title -->
+    <text x="640" y="441" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#565f89">claude-bar --demo --preset full</text>
+  </g>
+  <!-- Status bar bg -->
+  <rect x="140" y="464" width="1000" height="26" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <!-- full: model, version, gauge (87% red), context, cost, lines, duration, cwd, project -->
+  <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="15">
+    <text x="158" y="482" fill="#7aa2f7" filter="url(#glow)">Opus 4.6</text>
+    <text x="252" y="482" fill="#565f89">v2.1.63</text>
+    <text x="330" y="482" fill="#f7768e" font-size="16">⣿⣿⣿⣿⣿⣿⣿⣿⣷</text>
+    <text x="498" y="482" fill="#3b3d52" font-size="16">⠀</text>
+    <text x="516" y="482" fill="#f7768e">87%</text>
+    <text x="566" y="482" fill="#565f89">$5.24</text>
+    <text x="630" y="482" fill="#9ece6a">+245</text>
+    <text x="678" y="482" fill="#565f89">/</text>
+    <text x="688" y="482" fill="#f7768e">-9</text>
+    <text x="722" y="482" fill="#565f89">10m</text>
+    <text x="768" y="482" fill="#565f89">…/my-project</text>
+    <text x="904" y="482" fill="#565f89">…/my-project</text>
+  </g>
+
+  <!-- Rust badge -->
+  <rect x="553" y="530" width="174" height="30" rx="15" fill="#1a1b26" stroke="#2f3146" stroke-width="1"/>
+  <text x="640" y="550" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="13" fill="#f7768e">written in Rust 🦀</text>
+
+  <!-- Performance badge -->
+  <text x="640" y="595" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="14" fill="#3b3d52">~3ms startup · Nerd Font icons · ANSI colors</text>
+</svg>

@@ -123,13 +123,12 @@ fn preset_elements(name: &str) -> Option<Vec<Element>> {
         ],
         "default" => vec![
             Element::Model,
-            Element::Version,
             Element::Gauge,
             Element::Context,
-            Element::Cost,
-            Element::Lines,
             Element::Duration,
             Element::Cwd,
+            Element::ProjectDir,
+            Element::OutputStyle,
         ],
         "full" => ALL_ELEMENTS.to_vec(),
         _ => return None,
@@ -179,7 +178,7 @@ fn print_list() {
     eprintln!("PRESETS");
     eprintln!("  minimal   model, gauge, context");
     eprintln!("  compact   model, gauge, context, cost, cwd");
-    eprintln!("  default   model, version, gauge, context, cost, lines, duration, cwd");
+    eprintln!("  default   model, gauge, context, duration, cwd, project, style");
     eprintln!("  full      all elements");
     eprintln!();
     eprintln!("ELEMENTS");

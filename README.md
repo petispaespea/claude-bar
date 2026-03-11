@@ -49,7 +49,7 @@ Set via `--preset` flag or `CLAUDE_STATUSLINE` env var:
 |-----------|-------------------------------------------------------------|
 | `minimal` | model, gauge, context                                       |
 | `compact` | model, gauge, context, cost, cwd                            |
-| `default` | model, version, gauge, context, cost, lines, duration, cwd  |
+| `default` | model, gauge, context, duration, cwd, project, style         |
 | `full`    | all elements                                                |
 
 ```json

@@ -42,6 +42,80 @@ struct Workspace {
     project_dir: Option<String>,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Element {
+    Model,
+    Version,
+    Gauge,
+    Context,
+    Cost,
+    Lines,
+    Duration,
+    Cwd,
+    ProjectDir,
+    OutputStyle,
+}
+
+const ALL_ELEMENTS: &[Element] = &[
+    Element::Model,
+    Element::Version,
+    Element::Gauge,
+    Element::Context,
+    Element::Cost,
+    Element::Lines,
+    Element::Duration,
+    Element::Cwd,
+    Element::ProjectDir,
+    Element::OutputStyle,
+];
+
+fn preset_elements(name: &str) -> Vec<Element> {
+    match name {
+        "minimal" => vec![
+            Element::Model,
+            Element::Gauge,
+            Element::Context,
+        ],
+        "compact" => vec![
+            Element::Model,
+            Element::Gauge,
+            Element::Context,
+            Element::Cost,
+            Element::Cwd,
+        ],
+        "default" => vec![
+            Element::Model,
+            Element::Version,
+            Element::Gauge,
+            Element::Context,
+            Element::Cost,
+            Element::Lines,
+            Element::Duration,
+            Element::Cwd,
+        ],
+        "full" => ALL_ELEMENTS.to_vec(),
+        _ => ALL_ELEMENTS.to_vec(),
+    }
+}
+
+fn parse_custom_elements(spec: &str) -> Vec<Element> {
+    spec.split(',')
+        .filter_map(|s| match s.trim() {
+            "model" => Some(Element::Model),
+            "version" => Some(Element::Version),
+            "gauge" => Some(Element::Gauge),
+            "context" | "ctx" => Some(Element::Context),
+            "cost" => Some(Element::Cost),
+            "lines" => Some(Element::Lines),
+            "duration" | "time" => Some(Element::Duration),
+            "cwd" => Some(Element::Cwd),
+            "project" | "project_dir" => Some(Element::ProjectDir),
+            "style" | "output_style" => Some(Element::OutputStyle),
+            _ => None,
+        })
+        .collect()
+}
+
 const BRAILLE_LEVELS: [char; 9] = [
     '\u{2800}', // ⠀ empty
     '\u{2840}', // ⡀
@@ -119,7 +193,81 @@ fn shorten_path(path: &str) -> String {
     format!("…/{}", last_two.join("/"))
 }
 
+fn render_element(elem: Element, input: &Input) -> Option<String> {
+    match elem {
+        Element::Model => {
+            let name = input.model.as_ref()?.display_name.as_ref()?;
+            Some(format!("{CYAN}{name}{RESET}"))
+        }
+        Element::Version => {
+            let v = input.version.as_ref()?;
+            Some(format!("{DIM}v{v}{RESET}"))
+        }
+        Element::Gauge => {
+            let pct = input.context_window.as_ref()?.used_percentage?;
+            let color = pct_color(pct);
+            let gauge = braille_gauge(pct, 10, color);
+            let mut result = gauge;
+            if input.exceeds_200k_tokens.unwrap_or(false) {
+                result.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RESET}"));
+            }
+            Some(result)
+        }
+        Element::Context => {
+            let pct = input.context_window.as_ref()?.used_percentage?;
+            let color = pct_color(pct);
+            Some(format!("{color}{pct:.0}%{RESET}"))
+        }
+        Element::Cost => {
+            let c = input.cost.as_ref()?.total_cost_usd?;
+            Some(format!("{DIM}${c:.2}{RESET}"))
+        }
+        Element::Lines => {
+            let cost = input.cost.as_ref()?;
+            let added = cost.total_lines_added.unwrap_or(0);
+            let removed = cost.total_lines_removed.unwrap_or(0);
+            if added == 0 && removed == 0 {
+                return None;
+            }
+            Some(format!("{GREEN}+{added}{RESET}/{RED}-{removed}{RESET}"))
+        }
+        Element::Duration => {
+            let cost = input.cost.as_ref()?;
+            let session = cost.total_duration_ms.map(format_duration)?;
+            let result = match cost.total_api_duration_ms.map(format_duration) {
+                Some(api) => format!("{DIM}{session} (api {api}){RESET}"),
+                None => format!("{DIM}{session}{RESET}"),
+            };
+            Some(result)
+        }
+        Element::Cwd => {
+            let p = input.cwd.as_ref()?;
+            Some(format!("{DIM}{}{RESET}", shorten_path(p)))
+        }
+        Element::ProjectDir => {
+            let p = input.workspace.as_ref()?.project_dir.as_ref()?;
+            Some(format!("{DIM}proj:{}{RESET}", shorten_path(p)))
+        }
+        Element::OutputStyle => {
+            let name = input.output_style.as_ref()?.name.as_ref()?;
+            if name == "default" {
+                return None;
+            }
+            Some(format!("{DIM}[{name}]{RESET}"))
+        }
+    }
+}
+
 fn main() {
+    let preset = std::env::var("CLAUDE_STATUSLINE")
+        .unwrap_or_else(|_| "default".into());
+
+    let elements = if preset.contains(',') {
+        parse_custom_elements(&preset)
+    } else {
+        preset_elements(&preset)
+    };
+
     let mut buf = String::new();
     if std::io::stdin().read_to_string(&mut buf).is_err() {
         return;
@@ -130,81 +278,10 @@ fn main() {
         Err(_) => return,
     };
 
-    let model = input
-        .model
-        .and_then(|m| m.display_name)
-        .unwrap_or_else(|| "?".into());
+    let parts: Vec<String> = elements
+        .iter()
+        .filter_map(|e| render_element(*e, &input))
+        .collect();
 
-    let version_part = input
-        .version
-        .map(|v| format!(" {DIM}v{v}{RESET}"))
-        .unwrap_or_default();
-
-    let ctx_part = match input.context_window.and_then(|cw| cw.used_percentage) {
-        Some(pct) => {
-            let color = pct_color(pct);
-            let gauge = braille_gauge(pct, 10, color);
-            format!("{color}{gauge}{RESET}  {pct:.0}%")
-        }
-        None => "ctx: -".into(),
-    };
-
-    let exceeds_part = if input.exceeds_200k_tokens.unwrap_or(false) {
-        format!(" {BG_RED}{WHITE} CTX EXCEEDED {RESET}")
-    } else {
-        String::new()
-    };
-
-    let cost_part = input
-        .cost
-        .as_ref()
-        .and_then(|c| c.total_cost_usd)
-        .map(|c| format!("  {DIM}${c:.2}{RESET}"))
-        .unwrap_or_default();
-
-    let lines_part = match &input.cost {
-        Some(c) => {
-            let added = c.total_lines_added.unwrap_or(0);
-            let removed = c.total_lines_removed.unwrap_or(0);
-            if added > 0 || removed > 0 {
-                format!("  {GREEN}+{added}{RESET}/{RED}-{removed}{RESET}")
-            } else {
-                String::new()
-            }
-        }
-        None => String::new(),
-    };
-
-    let duration_part = match &input.cost {
-        Some(c) => {
-            let session = c.total_duration_ms.map(format_duration);
-            let api = c.total_api_duration_ms.map(format_duration);
-            match (session, api) {
-                (Some(s), Some(a)) => format!("  {DIM}{s} (api {a}){RESET}"),
-                (Some(s), None) => format!("  {DIM}{s}{RESET}"),
-                _ => String::new(),
-            }
-        }
-        None => String::new(),
-    };
-
-    let cwd_part = input
-        .cwd
-        .map(|p| format!("  {DIM}{}{RESET}", shorten_path(&p)))
-        .unwrap_or_default();
-
-    let project_part = input
-        .workspace
-        .and_then(|w| w.project_dir)
-        .map(|p| format!("  {DIM}proj:{}{RESET}", shorten_path(&p)))
-        .unwrap_or_default();
-
-    let style_part = input
-        .output_style
-        .and_then(|s| s.name)
-        .filter(|n| n != "default")
-        .map(|n| format!("  {DIM}[{n}]{RESET}"))
-        .unwrap_or_default();
-
-    print!("{CYAN}{model}{RESET}{version_part}  {ctx_part}{exceeds_part}{cost_part}{lines_part}{duration_part}{cwd_part}{project_part}{style_part}");
+    print!("{}", parts.join("  "));
 }

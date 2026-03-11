@@ -37,6 +37,9 @@ struct Cli {
 
     #[arg(long, help = "List available elements and presets")]
     list: bool,
+
+    #[arg(long, help = "Hide Nerd Font icons from elements")]
+    no_icons: bool,
 }
 
 #[derive(Deserialize)]
@@ -273,21 +276,37 @@ fn shorten_path(path: &str) -> String {
     format!("…/{}", last_two.join("/"))
 }
 
-fn render_element(elem: Element, input: &Input) -> Option<String> {
+fn icon(elem: Element) -> &'static str {
+    match elem {
+        Element::Model => "\u{e99a} ",
+        Element::Version => "\u{f412} ",
+        Element::Gauge => "\u{f0e70} ",
+        Element::Context => "\u{f0201} ",
+        Element::Cost => "\u{f155} ",
+        Element::Lines => "\u{f0dca} ",
+        Element::Duration => "\u{f017} ",
+        Element::Cwd => "\u{f115} ",
+        Element::ProjectDir => "\u{f07c} ",
+        Element::OutputStyle => "\u{f1fc} ",
+    }
+}
+
+fn render_element(elem: Element, input: &Input, show_icons: bool) -> Option<String> {
+    let prefix = if show_icons { icon(elem) } else { "" };
     match elem {
         Element::Model => {
             let name = input.model.as_ref()?.display_name.as_ref()?;
-            Some(format!("{CYAN}{name}{RESET}"))
+            Some(format!("{prefix}{CYAN}{name}{RESET}"))
         }
         Element::Version => {
             let v = input.version.as_ref()?;
-            Some(format!("{DIM}v{v}{RESET}"))
+            Some(format!("{prefix}{DIM}v{v}{RESET}"))
         }
         Element::Gauge => {
             let pct = input.context_window.as_ref()?.used_percentage?;
             let color = pct_color(pct);
             let gauge = braille_gauge(pct, 10, color);
-            let mut result = gauge;
+            let mut result = format!("{prefix}{gauge}");
             if input.exceeds_200k_tokens.unwrap_or(false) {
                 result.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RESET}"));
             }
@@ -296,11 +315,11 @@ fn render_element(elem: Element, input: &Input) -> Option<String> {
         Element::Context => {
             let pct = input.context_window.as_ref()?.used_percentage?;
             let color = pct_color(pct);
-            Some(format!("{color}{pct:.0}%{RESET}"))
+            Some(format!("{prefix}{color}{pct:.0}%{RESET}"))
         }
         Element::Cost => {
             let c = input.cost.as_ref()?.total_cost_usd?;
-            Some(format!("{DIM}${c:.2}{RESET}"))
+            Some(format!("{prefix}{DIM}${c:.2}{RESET}"))
         }
         Element::Lines => {
             let cost = input.cost.as_ref()?;
@@ -309,31 +328,31 @@ fn render_element(elem: Element, input: &Input) -> Option<String> {
             if added == 0 && removed == 0 {
                 return None;
             }
-            Some(format!("{GREEN}+{added}{RESET}/{RED}-{removed}{RESET}"))
+            Some(format!("{prefix}{GREEN}+{added}{RESET}/{RED}-{removed}{RESET}"))
         }
         Element::Duration => {
             let cost = input.cost.as_ref()?;
             let session = cost.total_duration_ms.map(format_duration)?;
             let result = match cost.total_api_duration_ms.map(format_duration) {
-                Some(api) => format!("{DIM}{session} (api {api}){RESET}"),
-                None => format!("{DIM}{session}{RESET}"),
+                Some(api) => format!("{prefix}{DIM}{session} (api {api}){RESET}"),
+                None => format!("{prefix}{DIM}{session}{RESET}"),
             };
             Some(result)
         }
         Element::Cwd => {
             let p = input.cwd.as_ref()?;
-            Some(format!("{DIM}{}{RESET}", shorten_path(p)))
+            Some(format!("{prefix}{DIM}{}{RESET}", shorten_path(p)))
         }
         Element::ProjectDir => {
             let p = input.workspace.as_ref()?.project_dir.as_ref()?;
-            Some(format!("{DIM}proj:{}{RESET}", shorten_path(p)))
+            Some(format!("{prefix}{DIM}{}{RESET}", shorten_path(p)))
         }
         Element::OutputStyle => {
             let name = input.output_style.as_ref()?.name.as_ref()?;
             if name == "default" {
                 return None;
             }
-            Some(format!("{DIM}[{name}]{RESET}"))
+            Some(format!("{prefix}{DIM}[{name}]{RESET}"))
         }
     }
 }
@@ -348,6 +367,14 @@ fn main() {
 
     let elements = resolve_elements(&cli);
 
+    let show_icons = if cli.no_icons {
+        false
+    } else {
+        std::env::var("CLAUDE_STATUSLINE_ICONS")
+            .map(|v| v != "0" && v != "false")
+            .unwrap_or(true)
+    };
+
     let mut buf = String::new();
     if std::io::stdin().read_to_string(&mut buf).is_err() {
         return;
@@ -360,7 +387,7 @@ fn main() {
 
     let parts: Vec<String> = elements
         .iter()
-        .filter_map(|e| render_element(*e, &input))
+        .filter_map(|e| render_element(*e, &input, show_icons))
         .collect();
 
     print!("{}", parts.join("  "));

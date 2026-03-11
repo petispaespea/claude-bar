@@ -1,10 +1,10 @@
-use crate::Input;
 use crate::config::{Element, IconMode};
 use crate::format::{format_duration, format_tokens, shorten_path};
+use crate::input::Input;
 
-const BRAILLE_LEVELS: [char; 9] = [
-    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}', '\u{28C7}', '\u{28E7}', '\u{28F7}',
-    '\u{28FF}',
+const BRAILLE: [char; 9] = [
+    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}',
+    '\u{28C7}', '\u{28E7}', '\u{28F7}', '\u{28FF}',
 ];
 
 const CYAN: &str = "\x1b[36m";
@@ -14,34 +14,24 @@ const RED: &str = "\x1b[31m";
 const BG_RED: &str = "\x1b[41m";
 const WHITE: &str = "\x1b[97m";
 const DIM: &str = "\x1b[2m";
-const RESET: &str = "\x1b[0m";
+const RST: &str = "\x1b[0m";
 
-fn braille_gauge(percentage: f64, width: usize, fill_color: &str) -> String {
-    let fill = percentage / 100.0 * width as f64;
-    let mut gauge = String::new();
-
-    for i in 0..width {
-        let level = (fill - i as f64).clamp(0.0, 1.0);
-        let idx = (level * 8.0).round() as usize;
-        if idx > 0 {
-            gauge.push_str(fill_color);
-        } else {
-            gauge.push_str(DIM);
-        }
-        gauge.push(BRAILLE_LEVELS[idx]);
-        gauge.push_str(RESET);
-    }
-
-    gauge
+fn gauge(pct: f64, width: usize, color: &str) -> String {
+    let fill = pct / 100.0 * width as f64;
+    (0..width)
+        .map(|i| {
+            let idx = ((fill - i as f64).clamp(0.0, 1.0) * 8.0).round() as usize;
+            let c = if idx > 0 { color } else { DIM };
+            format!("{c}{}{RST}", BRAILLE[idx])
+        })
+        .collect()
 }
 
 fn pct_color(pct: f64) -> &'static str {
-    if pct >= 80.0 {
-        RED
-    } else if pct >= 50.0 {
-        YELLOW
-    } else {
-        GREEN
+    match () {
+        _ if pct >= 80.0 => RED,
+        _ if pct >= 50.0 => YELLOW,
+        _ => GREEN,
     }
 }
 
@@ -84,89 +74,70 @@ fn icon(elem: Element, mode: IconMode) -> &'static str {
     }
 }
 
-pub fn render_element(elem: Element, input: &Input, icon_mode: IconMode) -> Option<String> {
-    let prefix = icon(elem, icon_mode);
+pub fn render(elem: Element, input: &Input, mode: IconMode) -> Option<String> {
+    let i = icon(elem, mode);
     match elem {
         Element::Model => {
             let name = input.model.as_ref()?.display_name.as_ref()?;
-            Some(format!("{prefix}{CYAN}{name}{RESET}"))
+            Some(format!("{i}{CYAN}{name}{RST}"))
         }
         Element::Version => {
             let v = input.version.as_ref()?;
-            Some(format!("{prefix}{DIM}v{v}{RESET}"))
+            Some(format!("{i}{DIM}v{v}{RST}"))
         }
         Element::Gauge => {
             let pct = input.context_window.as_ref()?.used_percentage?;
-            let color = pct_color(pct);
-            let gauge = braille_gauge(pct, 10, color);
-            let mut result = format!("{prefix}{gauge}");
+            let g = gauge(pct, 10, pct_color(pct));
+            let mut out = format!("{i}{g}");
             if input.exceeds_200k_tokens.unwrap_or(false) {
-                result.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RESET}"));
+                out.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RST}"));
             }
-            Some(result)
+            Some(out)
         }
         Element::Context => {
             let pct = input.context_window.as_ref()?.used_percentage?;
-            let color = pct_color(pct);
-            Some(format!("{prefix}{color}{pct:.0}%{RESET}"))
+            Some(format!("{i}{}{pct:.0}%{RST}", pct_color(pct)))
         }
         Element::Tokens => {
             let cw = input.context_window.as_ref()?;
-            let inp = cw.total_input_tokens?;
-            let out = cw.total_output_tokens?;
-            Some(format!(
-                "{prefix}{DIM}{}{RESET}{DIM}/{RESET}{DIM}{}{RESET}",
-                format_tokens(inp),
-                format_tokens(out)
-            ))
+            let inp = format_tokens(cw.total_input_tokens?);
+            let out = format_tokens(cw.total_output_tokens?);
+            Some(format!("{i}{DIM}{inp}/{out}{RST}"))
         }
         Element::Cache => {
-            let usage = input.context_window.as_ref()?.current_usage.as_ref()?;
-            let read = usage.cache_read_input_tokens.unwrap_or(0);
-            let write = usage.cache_creation_input_tokens.unwrap_or(0);
-            if read == 0 && write == 0 {
-                return None;
-            }
-            Some(format!(
-                "{prefix}{DIM}r:{} w:{}{RESET}",
-                format_tokens(read),
-                format_tokens(write)
-            ))
+            let u = input.context_window.as_ref()?.current_usage.as_ref()?;
+            let r = u.cache_read_input_tokens.unwrap_or(0);
+            let w = u.cache_creation_input_tokens.unwrap_or(0);
+            if r == 0 && w == 0 { return None; }
+            Some(format!("{i}{DIM}r:{} w:{}{RST}", format_tokens(r), format_tokens(w)))
         }
         Element::Cost => {
             let c = input.cost.as_ref()?.total_cost_usd?;
-            Some(format!("{prefix}{DIM}${c:.2}{RESET}"))
+            Some(format!("{i}{DIM}${c:.2}{RST}"))
         }
         Element::Lines => {
             let cost = input.cost.as_ref()?;
-            let added = cost.total_lines_added.unwrap_or(0);
-            let removed = cost.total_lines_removed.unwrap_or(0);
-            if added == 0 && removed == 0 {
-                return None;
-            }
-            Some(format!(
-                "{prefix}{GREEN}+{added}{RESET}/{RED}-{removed}{RESET}"
-            ))
+            let a = cost.total_lines_added.unwrap_or(0);
+            let d = cost.total_lines_removed.unwrap_or(0);
+            if a == 0 && d == 0 { return None; }
+            Some(format!("{i}{GREEN}+{a}{RST}/{RED}-{d}{RST}"))
         }
         Element::Duration => {
-            let cost = input.cost.as_ref()?;
-            let api = cost.total_api_duration_ms.map(format_duration)?;
-            Some(format!("{prefix}{DIM}{api}{RESET}"))
+            let ms = input.cost.as_ref()?.total_api_duration_ms?;
+            Some(format!("{i}{DIM}{}{RST}", format_duration(ms)))
         }
         Element::Cwd => {
             let p = input.cwd.as_ref()?;
-            Some(format!("{prefix}{DIM}{}{RESET}", shorten_path(p)))
+            Some(format!("{i}{DIM}{}{RST}", shorten_path(p)))
         }
         Element::ProjectDir => {
             let p = input.workspace.as_ref()?.project_dir.as_ref()?;
-            Some(format!("{prefix}{DIM}{}{RESET}", shorten_path(p)))
+            Some(format!("{i}{DIM}{}{RST}", shorten_path(p)))
         }
         Element::OutputStyle => {
             let name = input.output_style.as_ref()?.name.as_ref()?;
-            if name == "default" {
-                return None;
-            }
-            Some(format!("{prefix}{DIM}[{name}]{RESET}"))
+            if name == "default" { return None; }
+            Some(format!("{i}{DIM}[{name}]{RST}"))
         }
     }
 }

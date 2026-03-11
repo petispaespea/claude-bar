@@ -1,3 +1,5 @@
+use clap::Parser;
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Element {
     Model,
@@ -21,7 +23,7 @@ pub enum IconMode {
     FontAwesome,
 }
 
-pub const ALL_ELEMENTS: &[Element] = &[
+const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
     Element::Version,
     Element::Gauge,
@@ -35,8 +37,6 @@ pub const ALL_ELEMENTS: &[Element] = &[
     Element::ProjectDir,
     Element::OutputStyle,
 ];
-
-use clap::Parser;
 
 #[derive(Parser)]
 #[command(
@@ -55,33 +55,19 @@ use clap::Parser;
         Configuration priority: CLI flags > CLAUDE_BAR env var > default preset"
 )]
 pub struct Cli {
-    #[arg(
-        short,
-        long,
-        value_name = "NAME",
-        help = "Preset profile: minimal, compact, default, full"
-    )]
+    #[arg(short, long, value_name = "NAME", help = "Preset: minimal, compact, default, full")]
     pub preset: Option<String>,
 
-    #[arg(
-        short,
-        long,
-        value_name = "LIST",
-        help = "Comma-separated elements: model,version,gauge,ctx,tokens,cache,cost,lines,duration,cwd,project,style"
-    )]
+    #[arg(short, long, value_name = "LIST", help = "Comma-separated elements")]
     pub elements: Option<String>,
 
     #[arg(long, help = "List available elements and presets")]
     pub list: bool,
 
-    #[arg(long, help = "Hide Nerd Font icons from elements")]
+    #[arg(long, help = "Hide Nerd Font icons")]
     pub no_icons: bool,
 
-    #[arg(
-        long = "icon-set",
-        value_name = "SET",
-        help = "Icon set: octicons (default), fontawesome"
-    )]
+    #[arg(long = "icon-set", value_name = "SET", help = "Icon set: octicons (default), fontawesome")]
     pub icon_set: Option<String>,
 
     #[arg(long, help = "Render with sample data (no stdin required)")]
@@ -90,34 +76,20 @@ pub struct Cli {
 
 fn preset_elements(name: &str) -> Option<Vec<Element>> {
     Some(match name {
-        "minimal" => vec![
-            Element::Model,
-            Element::Gauge,
-            Element::Context,
-        ],
+        "minimal" => vec![Element::Model, Element::Gauge, Element::Context],
         "compact" => vec![
-            Element::Model,
-            Element::Gauge,
-            Element::Context,
-            Element::Cost,
-            Element::Cwd,
+            Element::Model, Element::Gauge, Element::Context, Element::Cost, Element::Cwd,
         ],
         "default" => vec![
-            Element::Model,
-            Element::Gauge,
-            Element::Context,
-            Element::Tokens,
-            Element::Duration,
-            Element::Cwd,
-            Element::ProjectDir,
-            Element::OutputStyle,
+            Element::Model, Element::Gauge, Element::Context, Element::Tokens,
+            Element::Duration, Element::Cwd, Element::ProjectDir, Element::OutputStyle,
         ],
         "full" => ALL_ELEMENTS.to_vec(),
         _ => return None,
     })
 }
 
-fn parse_custom_elements(spec: &str) -> Vec<Element> {
+fn parse_elements(spec: &str) -> Vec<Element> {
     spec.split(',')
         .filter_map(|s| match s.trim() {
             "model" => Some(Element::Model),
@@ -137,72 +109,66 @@ fn parse_custom_elements(spec: &str) -> Vec<Element> {
         .collect()
 }
 
+fn env(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|v| !v.is_empty())
+}
+
 pub fn resolve_elements(cli: &Cli) -> Vec<Element> {
     if let Some(ref spec) = cli.elements {
-        return parse_custom_elements(spec);
+        return parse_elements(spec);
     }
-
     if let Some(ref name) = cli.preset {
-        if let Some(elems) = preset_elements(name) {
-            return elems;
-        }
-        eprintln!("Unknown preset: {name}. Use --list to see available presets.");
-        std::process::exit(1);
+        return preset_elements(name).unwrap_or_else(|| {
+            eprintln!("Unknown preset: {name}. Use --list to see available presets.");
+            std::process::exit(1);
+        });
     }
-
-    let env_val = std::env::var("CLAUDE_BAR").unwrap_or_else(|_| "default".into());
-    if env_val.contains(',') {
-        parse_custom_elements(&env_val)
+    let val = env("CLAUDE_BAR").unwrap_or_else(|| "default".into());
+    if val.contains(',') {
+        parse_elements(&val)
     } else {
-        preset_elements(&env_val).unwrap_or_else(|| ALL_ELEMENTS.to_vec())
+        preset_elements(&val).unwrap_or_else(|| ALL_ELEMENTS.to_vec())
     }
 }
 
 pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
-    if cli.no_icons {
+    if cli.no_icons || env("CLAUDE_BAR_ICONS").is_some_and(|v| v == "0" || v == "false") {
         return IconMode::None;
     }
-    if let Ok(v) = std::env::var("CLAUDE_BAR_ICONS") {
-        if v == "0" || v == "false" {
-            return IconMode::None;
-        }
-    }
-    let set_name = cli.icon_set.as_deref().or_else(|| {
-        std::env::var("CLAUDE_BAR_ICON_SET").ok().and_then(|v| {
-            // Leak is fine — runs once at startup
-            Some(&*Box::leak(v.into_boxed_str()) as &str)
-        })
-    });
-    match set_name {
+    let env_set = env("CLAUDE_BAR_ICON_SET");
+    let set = cli.icon_set.as_deref().or(env_set.as_deref());
+    match set {
         Some("fontawesome" | "fa") => IconMode::FontAwesome,
         _ => IconMode::Octicons,
     }
 }
 
 pub fn print_list() {
-    eprintln!("PRESETS");
-    eprintln!("  minimal   model, gauge, context");
-    eprintln!("  compact   model, gauge, context, cost, cwd");
-    eprintln!("  default   model, gauge, context, tokens, duration, cwd, project, style");
-    eprintln!("  full      all elements");
-    eprintln!();
-    eprintln!("ELEMENTS");
-    eprintln!("  model          Model display name (e.g. Opus 4.6)");
-    eprintln!("  version        Claude Code version");
-    eprintln!("  gauge          Braille-dot context usage bar (color-coded)");
-    eprintln!("  context, ctx   Context usage percentage");
-    eprintln!("  tokens         Input/output token counts");
-    eprintln!("  cache          Cache read/write token counts");
-    eprintln!("  cost           Session cost in USD");
-    eprintln!("  lines          Lines added/removed this session");
-    eprintln!("  duration, time API wait time");
-    eprintln!("  cwd            Current working directory (shortened)");
-    eprintln!("  project,       Project root directory (shortened)");
-    eprintln!("    project_dir");
-    eprintln!("  style,         Output style (hidden when \"default\")");
-    eprintln!("    output_style");
-    eprintln!();
-    eprintln!("ICON SETS");
-    eprintln!("  octicons       Octicons (default)");
-    eprintln!("  fontawesome, fa  Font Awesome");
+    eprint!("\
+PRESETS
+  minimal        model, gauge, context
+  compact        model, gauge, context, cost, cwd
+  default        model, gauge, context, tokens, duration, cwd, project, style
+  full           all elements
+
+ELEMENTS
+  model          Model display name (e.g. Opus 4.6)
+  version        Claude Code version
+  gauge          Braille-dot context usage bar (color-coded)
+  context, ctx   Context usage percentage
+  tokens         Input/output token counts
+  cache          Cache read/write token counts
+  cost           Session cost in USD
+  lines          Lines added/removed this session
+  duration, time API wait time
+  cwd            Current working directory (shortened)
+  project,       Project root directory (shortened)
+    project_dir
+  style,         Output style (hidden when \"default\")
+    output_style
+
+ICON SETS
+  octicons       Octicons (default)
+  fontawesome    Font Awesome (alias: fa)
+");
 }

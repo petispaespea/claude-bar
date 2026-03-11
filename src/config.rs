@@ -4,6 +4,8 @@ pub enum Element {
     Version,
     Gauge,
     Context,
+    Tokens,
+    Cache,
     Cost,
     Lines,
     Duration,
@@ -17,6 +19,8 @@ pub const ALL_ELEMENTS: &[Element] = &[
     Element::Version,
     Element::Gauge,
     Element::Context,
+    Element::Tokens,
+    Element::Cache,
     Element::Cost,
     Element::Lines,
     Element::Duration,
@@ -56,7 +60,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements: model,version,gauge,ctx,cost,lines,duration,cwd,project,style"
+        help = "Comma-separated elements: model,version,gauge,ctx,tokens,cache,cost,lines,duration,cwd,project,style"
     )]
     pub elements: Option<String>,
 
@@ -88,6 +92,7 @@ fn preset_elements(name: &str) -> Option<Vec<Element>> {
             Element::Model,
             Element::Gauge,
             Element::Context,
+            Element::Tokens,
             Element::Duration,
             Element::Cwd,
             Element::ProjectDir,
@@ -105,6 +110,8 @@ fn parse_custom_elements(spec: &str) -> Vec<Element> {
             "version" => Some(Element::Version),
             "gauge" => Some(Element::Gauge),
             "context" | "ctx" => Some(Element::Context),
+            "tokens" => Some(Element::Tokens),
+            "cache" => Some(Element::Cache),
             "cost" => Some(Element::Cost),
             "lines" => Some(Element::Lines),
             "duration" | "time" => Some(Element::Duration),
@@ -150,7 +157,7 @@ pub fn print_list() {
     eprintln!("PRESETS");
     eprintln!("  minimal   model, gauge, context");
     eprintln!("  compact   model, gauge, context, cost, cwd");
-    eprintln!("  default   model, gauge, context, duration, cwd, project, style");
+    eprintln!("  default   model, gauge, context, tokens, duration, cwd, project, style");
     eprintln!("  full      all elements");
     eprintln!();
     eprintln!("ELEMENTS");
@@ -158,6 +165,8 @@ pub fn print_list() {
     eprintln!("  version        Claude Code version");
     eprintln!("  gauge          Braille-dot context usage bar (color-coded)");
     eprintln!("  context, ctx   Context usage percentage");
+    eprintln!("  tokens         Input/output token counts");
+    eprintln!("  cache          Cache read/write token counts");
     eprintln!("  cost           Session cost in USD");
     eprintln!("  lines          Lines added/removed this session");
     eprintln!("  duration, time API wait time");

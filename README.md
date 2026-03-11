@@ -10,7 +10,8 @@ A fast, configurable status line for [Claude Code](https://claude.ai/code), writ
 
 - Nerd Font icons for each element (optional, on by default)
 - Braille-dot context gauge with color-coded fill (green < 50%, yellow 50-79%, red 80%+)
-- Model name, version, session cost, lines changed, API wait time, working directory
+- Model name, version, session cost, token counts, lines changed, API wait time, working directory
+- Cache statistics (read/write token counts)
 - Context exceeded warning when over the token limit
 - Configurable via presets or custom element lists
 - Near-instant startup (~3ms) thanks to compiled Rust binary
@@ -46,12 +47,12 @@ Configuration priority: CLI flags > `CLAUDE_BAR` env var > `default` preset.
 
 Set via `--preset` flag or `CLAUDE_BAR` env var:
 
-| Preset    | Elements                                              |
-|-----------|-------------------------------------------------------|
-| `minimal` | model, gauge, context                                 |
-| `compact` | model, gauge, context, cost, cwd                      |
-| `default` | model, gauge, context, duration, cwd, project, style  |
-| `full`    | all elements                                          |
+| Preset    | Elements                                                      |
+|-----------|---------------------------------------------------------------|
+| `minimal` | model, gauge, context                                         |
+| `compact` | model, gauge, context, cost, cwd                              |
+| `default` | model, gauge, context, tokens, duration, cwd, project, style  |
+| `full`    | all elements                                                  |
 
 ```json
 {
@@ -88,6 +89,8 @@ Nerd Font icons are shown by default. Disable with:
 | `version`            |     | Claude Code version                   |
 | `gauge`              | 󰹰    | Braille-dot context usage bar         |
 | `context` / `ctx`    | 󰈁    | Context usage percentage              |
+| `tokens`             | 󰒠    | Input/output token counts             |
+| `cache`              |     | Cache read/write token counts         |
 | `cost`               |     | Session cost in USD                   |
 | `lines`              | 󰷈    | Lines added/removed this session      |
 | `duration` / `time`  |     | API wait time                         |

@@ -9,6 +9,16 @@ pub fn format_duration(ms: u64) -> String {
     }
 }
 
+pub fn format_tokens(count: u64) -> String {
+    if count >= 1_000_000 {
+        format!("{:.1}M", count as f64 / 1_000_000.0)
+    } else if count >= 1_000 {
+        format!("{:.1}k", count as f64 / 1_000.0)
+    } else {
+        format!("{count}")
+    }
+}
+
 pub fn shorten_path(path: &str) -> String {
     let home = std::env::var("HOME").unwrap_or_default();
     let shortened = if !home.is_empty() && path.starts_with(&home) {

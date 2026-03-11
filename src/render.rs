@@ -1,5 +1,5 @@
 use crate::config::Element;
-use crate::format::{format_duration, shorten_path};
+use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::Input;
 
 const BRAILLE_LEVELS: [char; 9] = [
@@ -51,6 +51,8 @@ fn icon(elem: Element) -> &'static str {
         Element::Version => "\u{f412} ",
         Element::Gauge => "\u{f0e70} ",
         Element::Context => "\u{f0201} ",
+        Element::Tokens => "\u{f04a0} ",
+        Element::Cache => "\u{f1c0} ",
         Element::Cost => "\u{f155} ",
         Element::Lines => "\u{f0dca} ",
         Element::Duration => "\u{f253} ",
@@ -85,6 +87,29 @@ pub fn render_element(elem: Element, input: &Input, show_icons: bool) -> Option<
             let pct = input.context_window.as_ref()?.used_percentage?;
             let color = pct_color(pct);
             Some(format!("{prefix}{color}{pct:.0}%{RESET}"))
+        }
+        Element::Tokens => {
+            let cw = input.context_window.as_ref()?;
+            let inp = cw.total_input_tokens?;
+            let out = cw.total_output_tokens?;
+            Some(format!(
+                "{prefix}{DIM}{}{RESET}{DIM}/{RESET}{DIM}{}{RESET}",
+                format_tokens(inp),
+                format_tokens(out)
+            ))
+        }
+        Element::Cache => {
+            let usage = input.context_window.as_ref()?.current_usage.as_ref()?;
+            let read = usage.cache_read_input_tokens.unwrap_or(0);
+            let write = usage.cache_creation_input_tokens.unwrap_or(0);
+            if read == 0 && write == 0 {
+                return None;
+            }
+            Some(format!(
+                "{prefix}{DIM}r:{} w:{}{RESET}",
+                format_tokens(read),
+                format_tokens(write)
+            ))
         }
         Element::Cost => {
             let c = input.cost.as_ref()?.total_cost_usd?;

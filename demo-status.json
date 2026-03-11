@@ -1,0 +1,39 @@
+{
+  "session_id": "1dcfa1f6-efb7-48b0-b6be-29da4dfb8a94",
+  "transcript_path": "/Users/demo/.claude/projects/my-project/transcript.jsonl",
+  "cwd": "/Users/demo/Git/my-project",
+  "model": {
+    "id": "claude-opus-4-6",
+    "display_name": "Opus 4.6"
+  },
+  "workspace": {
+    "current_dir": "/Users/demo/Git/my-project",
+    "project_dir": "/Users/demo/Git/my-project",
+    "added_dirs": []
+  },
+  "version": "2.1.69",
+  "output_style": {
+    "name": "default"
+  },
+  "cost": {
+    "total_cost_usd": 4.11,
+    "total_duration_ms": 6887404,
+    "total_api_duration_ms": 1019272,
+    "total_lines_added": 438,
+    "total_lines_removed": 265
+  },
+  "context_window": {
+    "total_input_tokens": 3931,
+    "total_output_tokens": 28564,
+    "context_window_size": 200000,
+    "current_usage": {
+      "input_tokens": 3,
+      "output_tokens": 9,
+      "cache_creation_input_tokens": 1505,
+      "cache_read_input_tokens": 58984
+    },
+    "used_percentage": 30,
+    "remaining_percentage": 70
+  },
+  "exceeds_200k_tokens": false
+}

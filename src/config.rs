@@ -14,6 +14,13 @@ pub enum Element {
     OutputStyle,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum IconMode {
+    None,
+    Octicons,
+    FontAwesome,
+}
+
 pub const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
     Element::Version,
@@ -69,6 +76,13 @@ pub struct Cli {
 
     #[arg(long, help = "Hide Nerd Font icons from elements")]
     pub no_icons: bool,
+
+    #[arg(
+        long = "icon-set",
+        value_name = "SET",
+        help = "Icon set: octicons (default), fontawesome"
+    )]
+    pub icon_set: Option<String>,
 
     #[arg(long, help = "Render with sample data (no stdin required)")]
     pub demo: bool,
@@ -144,13 +158,25 @@ pub fn resolve_elements(cli: &Cli) -> Vec<Element> {
     }
 }
 
-pub fn resolve_icons(cli: &Cli) -> bool {
+pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
     if cli.no_icons {
-        return false;
+        return IconMode::None;
     }
-    std::env::var("CLAUDE_BAR_ICONS")
-        .map(|v| v != "0" && v != "false")
-        .unwrap_or(true)
+    if let Ok(v) = std::env::var("CLAUDE_BAR_ICONS") {
+        if v == "0" || v == "false" {
+            return IconMode::None;
+        }
+    }
+    let set_name = cli.icon_set.as_deref().or_else(|| {
+        std::env::var("CLAUDE_BAR_ICON_SET").ok().and_then(|v| {
+            // Leak is fine — runs once at startup
+            Some(&*Box::leak(v.into_boxed_str()) as &str)
+        })
+    });
+    match set_name {
+        Some("fontawesome" | "fa") => IconMode::FontAwesome,
+        _ => IconMode::Octicons,
+    }
 }
 
 pub fn print_list() {
@@ -175,4 +201,8 @@ pub fn print_list() {
     eprintln!("    project_dir");
     eprintln!("  style,         Output style (hidden when \"default\")");
     eprintln!("    output_style");
+    eprintln!();
+    eprintln!("ICON SETS");
+    eprintln!("  octicons       Octicons (default)");
+    eprintln!("  fontawesome, fa  Font Awesome");
 }

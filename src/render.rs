@@ -1,10 +1,10 @@
-use crate::config::Element;
-use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::Input;
+use crate::config::{Element, IconMode};
+use crate::format::{format_duration, format_tokens, shorten_path};
 
 const BRAILLE_LEVELS: [char; 9] = [
-    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}',
-    '\u{2847}', '\u{28C7}', '\u{28E7}', '\u{28F7}', '\u{28FF}',
+    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}', '\u{28C7}', '\u{28E7}', '\u{28F7}',
+    '\u{28FF}',
 ];
 
 const CYAN: &str = "\x1b[36m";
@@ -45,25 +45,47 @@ fn pct_color(pct: f64) -> &'static str {
     }
 }
 
-fn icon(elem: Element) -> &'static str {
-    match elem {
-        Element::Model => "\u{f16a3} ",
-        Element::Version => "\u{f412} ",
-        Element::Gauge => "\u{f0e70} ",
-        Element::Context => "\u{f0201} ",
-        Element::Tokens => "\u{f04a0} ",
-        Element::Cache => "\u{f1c0} ",
-        Element::Cost => "\u{f155} ",
-        Element::Lines => "\u{f0dca} ",
-        Element::Duration => "\u{f253} ",
-        Element::Cwd => "\u{f115} ",
-        Element::ProjectDir => "\u{f07c} ",
-        Element::OutputStyle => "\u{f1fc} ",
+fn icon(elem: Element, mode: IconMode) -> &'static str {
+    match mode {
+        IconMode::None => match elem {
+            Element::Duration => "api:",
+            Element::Cwd => "cwd:",
+            Element::ProjectDir => "proj:",
+            _ => "",
+        },
+        IconMode::Octicons => match elem {
+            Element::Model => "\u{f4be} ",
+            Element::Version => "\u{f412} ",
+            Element::Gauge => "\u{f4ed} ",
+            Element::Context => "\u{f463} ",
+            Element::Tokens => "\u{f4df} ",
+            Element::Cache => "\u{f49b} ",
+            Element::Cost => "\u{f439} ",
+            Element::Lines => "\u{f4d2} ",
+            Element::Duration => "\u{f4e3} ",
+            Element::Cwd => "\u{f413} ",
+            Element::ProjectDir => "\u{f46d} ",
+            Element::OutputStyle => "\u{f48f} ",
+        },
+        IconMode::FontAwesome => match elem {
+            Element::Model => "\u{ee0d} ",
+            Element::Version => "\u{f02b} ",
+            Element::Gauge => "\u{ef0d} ",
+            Element::Context => "\u{eeb2} ",
+            Element::Tokens => "\u{f292} ",
+            Element::Cache => "\u{f1c0} ",
+            Element::Cost => "\u{f09d} ",
+            Element::Lines => "\u{f05f} ",
+            Element::Duration => "\u{f254} ",
+            Element::Cwd => "\u{f114} ",
+            Element::ProjectDir => "\u{f015} ",
+            Element::OutputStyle => "\u{f1fc} ",
+        },
     }
 }
 
-pub fn render_element(elem: Element, input: &Input, show_icons: bool) -> Option<String> {
-    let prefix = if show_icons { icon(elem) } else { "" };
+pub fn render_element(elem: Element, input: &Input, icon_mode: IconMode) -> Option<String> {
+    let prefix = icon(elem, icon_mode);
     match elem {
         Element::Model => {
             let name = input.model.as_ref()?.display_name.as_ref()?;
@@ -122,7 +144,9 @@ pub fn render_element(elem: Element, input: &Input, show_icons: bool) -> Option<
             if added == 0 && removed == 0 {
                 return None;
             }
-            Some(format!("{prefix}{GREEN}+{added}{RESET}/{RED}-{removed}{RESET}"))
+            Some(format!(
+                "{prefix}{GREEN}+{added}{RESET}/{RED}-{removed}{RESET}"
+            ))
         }
         Element::Duration => {
             let cost = input.cost.as_ref()?;

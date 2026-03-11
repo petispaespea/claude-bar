@@ -3,7 +3,7 @@ mod format;
 mod render;
 
 use clap::Parser;
-use config::{Cli, resolve_elements, resolve_icons};
+use config::{Cli, resolve_elements, resolve_icon_mode};
 use render::render_element;
 use serde::Deserialize;
 use std::io::Read;
@@ -92,7 +92,7 @@ fn main() {
     }
 
     let elements = resolve_elements(&cli);
-    let show_icons = resolve_icons(&cli);
+    let icon_mode = resolve_icon_mode(&cli);
 
     let input = if cli.demo {
         demo_input()
@@ -109,7 +109,7 @@ fn main() {
 
     let parts: Vec<String> = elements
         .iter()
-        .filter_map(|e| render_element(*e, &input, show_icons))
+        .filter_map(|e| render_element(*e, &input, icon_mode))
         .collect();
 
     print!("{}", parts.join("  "));

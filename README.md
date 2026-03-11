@@ -3,16 +3,17 @@
 A fast, configurable status line for [Claude Code](https://claude.ai/code), written in Rust.
 
 ```
-Opus 4.6  v2.1.63  ⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀  34%  $5.24  +245/-9  6h32m (api 10m)  …/apple/spiderweb
+󱚣 Opus 4.6  󰹰 ⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀  󰁫 34%   10m   …/my-project   …/my-project
 ```
 
 ## Features
 
+- Nerd Font icons for each element (optional, on by default)
 - Braille-dot context gauge with color-coded fill (green < 50%, yellow 50-79%, red 80%+)
-- Model name, version, session cost, lines changed, duration, working directory
+- Model name, version, session cost, lines changed, API wait time, working directory
 - Context exceeded warning when over the token limit
 - Configurable via presets or custom element lists
-- Near-instant startup (~2ms) thanks to compiled Rust binary
+- Near-instant startup (~3ms) thanks to compiled Rust binary
 
 ## Installation
 
@@ -45,12 +46,12 @@ Configuration priority: CLI flags > `CLAUDE_STATUSLINE` env var > `default` pres
 
 Set via `--preset` flag or `CLAUDE_STATUSLINE` env var:
 
-| Preset    | Elements                                                    |
-|-----------|-------------------------------------------------------------|
-| `minimal` | model, gauge, context                                       |
-| `compact` | model, gauge, context, cost, cwd                            |
-| `default` | model, gauge, context, duration, cwd, project, style         |
-| `full`    | all elements                                                |
+| Preset    | Elements                                              |
+|-----------|-------------------------------------------------------|
+| `minimal` | model, gauge, context                                 |
+| `compact` | model, gauge, context, cost, cwd                      |
+| `default` | model, gauge, context, duration, cwd, project, style  |
+| `full`    | all elements                                          |
 
 ```json
 {
@@ -72,28 +73,39 @@ Pick individual elements with `--elements` or a comma-separated env var:
 }
 ```
 
+### Icons
+
+Nerd Font icons are shown by default. Disable with:
+
+- `--no-icons` flag
+- `"CLAUDE_STATUSLINE_ICONS": "false"` in the settings.json `env` block
+
 ### Available elements
 
-| Element              | Description                                |
-|----------------------|--------------------------------------------|
-| `model`              | Model display name (e.g. Opus 4.6)        |
-| `version`            | Claude Code version                        |
-| `gauge`              | Braille-dot context usage bar              |
-| `context` / `ctx`    | Context usage percentage                   |
-| `cost`               | Session cost in USD                        |
-| `lines`              | Lines added/removed this session           |
-| `duration` / `time`  | Session uptime and API wait time           |
-| `cwd`                | Current working directory (shortened)      |
-| `project` / `project_dir` | Project root directory (shortened)    |
-| `style` / `output_style`  | Output style (hidden when "default")  |
+| Element              | Icon | Description                           |
+|----------------------|------|---------------------------------------|
+| `model`              | 󱚣    | Model display name (e.g. Opus 4.6)   |
+| `version`            |     | Claude Code version                   |
+| `gauge`              | 󰹰    | Braille-dot context usage bar         |
+| `context` / `ctx`    | 󰈁    | Context usage percentage              |
+| `cost`               |     | Session cost in USD                   |
+| `lines`              | 󰷈    | Lines added/removed this session      |
+| `duration` / `time`  |     | API wait time                         |
+| `cwd`                |     | Current working directory (shortened) |
+| `project` / `project_dir` |  | Project root directory (shortened)   |
+| `style` / `output_style`  |  | Output style (hidden when "default") |
 
 ## CLI usage
 
 ```
 claude-statusline --help              # Full help
 claude-statusline --list              # Show presets and elements
-claude-statusline --preset compact    # Use a preset
-claude-statusline --elements model,gauge,ctx,cost  # Custom elements
+claude-statusline --demo              # Render with sample data (no stdin needed)
+claude-statusline --demo --preset full        # Preview a preset
+claude-statusline --demo --no-icons           # Preview without icons
+claude-statusline --demo --elements model,gauge,ctx  # Preview custom layout
+claude-statusline --preset compact    # Use a preset (reads stdin)
+claude-statusline --elements model,gauge,ctx,cost     # Custom elements (reads stdin)
 ```
 
 ## How it works

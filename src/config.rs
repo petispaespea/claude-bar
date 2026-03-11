@@ -29,7 +29,7 @@ use clap::Parser;
 
 #[derive(Parser)]
 #[command(
-    name = "claude-statusline",
+    name = "claude-bar",
     about = "Configurable status line for Claude Code",
     long_about = "Renders a configurable status line for Claude Code.\n\n\
         Reads JSON from stdin (provided by Claude Code) and outputs a \
@@ -39,9 +39,9 @@ use clap::Parser;
         Add to ~/.claude/settings.json:\n    \
         \"statusLine\": {\n      \
         \"type\": \"command\",\n      \
-        \"command\": \"/path/to/claude-statusline\"\n    \
+        \"command\": \"/path/to/claude-bar\"\n    \
         }\n\n\
-        Configuration priority: CLI flags > CLAUDE_STATUSLINE env var > default preset"
+        Configuration priority: CLI flags > CLAUDE_BAR env var > default preset"
 )]
 pub struct Cli {
     #[arg(
@@ -129,7 +129,7 @@ pub fn resolve_elements(cli: &Cli) -> Vec<Element> {
         std::process::exit(1);
     }
 
-    let env_val = std::env::var("CLAUDE_STATUSLINE").unwrap_or_else(|_| "default".into());
+    let env_val = std::env::var("CLAUDE_BAR").unwrap_or_else(|_| "default".into());
     if env_val.contains(',') {
         parse_custom_elements(&env_val)
     } else {
@@ -141,7 +141,7 @@ pub fn resolve_icons(cli: &Cli) -> bool {
     if cli.no_icons {
         return false;
     }
-    std::env::var("CLAUDE_STATUSLINE_ICONS")
+    std::env::var("CLAUDE_BAR_ICONS")
         .map(|v| v != "0" && v != "false")
         .unwrap_or(true)
 }

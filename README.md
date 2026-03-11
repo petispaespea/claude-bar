@@ -1,4 +1,4 @@
-# claude-statusline
+# claude-bar
 
 A fast, configurable status line for [Claude Code](https://claude.ai/code), written in Rust.
 
@@ -19,11 +19,11 @@ A fast, configurable status line for [Claude Code](https://claude.ai/code), writ
 
 ```bash
 git clone <repo-url>
-cd claude-statusline
+cd claude-bar
 cargo build --release
 ```
 
-The binary is at `target/release/claude-statusline`.
+The binary is at `target/release/claude-bar`.
 
 ## Setup
 
@@ -33,18 +33,18 @@ Add to `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "/path/to/claude-statusline"
+    "command": "/path/to/claude-bar"
   }
 }
 ```
 
 ## Configuration
 
-Configuration priority: CLI flags > `CLAUDE_STATUSLINE` env var > `default` preset.
+Configuration priority: CLI flags > `CLAUDE_BAR` env var > `default` preset.
 
 ### Presets
 
-Set via `--preset` flag or `CLAUDE_STATUSLINE` env var:
+Set via `--preset` flag or `CLAUDE_BAR` env var:
 
 | Preset    | Elements                                              |
 |-----------|-------------------------------------------------------|
@@ -56,7 +56,7 @@ Set via `--preset` flag or `CLAUDE_STATUSLINE` env var:
 ```json
 {
   "env": {
-    "CLAUDE_STATUSLINE": "compact"
+    "CLAUDE_BAR": "compact"
   }
 }
 ```
@@ -68,7 +68,7 @@ Pick individual elements with `--elements` or a comma-separated env var:
 ```json
 {
   "env": {
-    "CLAUDE_STATUSLINE": "model,gauge,ctx,cost,cwd"
+    "CLAUDE_BAR": "model,gauge,ctx,cost,cwd"
   }
 }
 ```
@@ -78,7 +78,7 @@ Pick individual elements with `--elements` or a comma-separated env var:
 Nerd Font icons are shown by default. Disable with:
 
 - `--no-icons` flag
-- `"CLAUDE_STATUSLINE_ICONS": "false"` in the settings.json `env` block
+- `"CLAUDE_BAR_ICONS": "false"` in the settings.json `env` block
 
 ### Available elements
 
@@ -98,14 +98,14 @@ Nerd Font icons are shown by default. Disable with:
 ## CLI usage
 
 ```
-claude-statusline --help              # Full help
-claude-statusline --list              # Show presets and elements
-claude-statusline --demo              # Render with sample data (no stdin needed)
-claude-statusline --demo --preset full        # Preview a preset
-claude-statusline --demo --no-icons           # Preview without icons
-claude-statusline --demo --elements model,gauge,ctx  # Preview custom layout
-claude-statusline --preset compact    # Use a preset (reads stdin)
-claude-statusline --elements model,gauge,ctx,cost     # Custom elements (reads stdin)
+claude-bar --help              # Full help
+claude-bar --list              # Show presets and elements
+claude-bar --demo              # Render with sample data (no stdin needed)
+claude-bar --demo --preset full        # Preview a preset
+claude-bar --demo --no-icons           # Preview without icons
+claude-bar --demo --elements model,gauge,ctx  # Preview custom layout
+claude-bar --preset compact    # Use a preset (reads stdin)
+claude-bar --elements model,gauge,ctx,cost     # Custom elements (reads stdin)
 ```
 
 ## How it works

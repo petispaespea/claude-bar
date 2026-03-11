@@ -72,6 +72,9 @@ pub struct Cli {
 
     #[arg(long, help = "Render with sample data (no stdin required)")]
     pub demo: bool,
+
+    #[arg(long, help = "Add statusLine to ~/.claude/settings.json")]
+    pub setup: bool,
 }
 
 fn preset_elements(name: &str) -> Option<Vec<Element>> {

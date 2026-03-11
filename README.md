@@ -8,7 +8,7 @@ A fast, configurable status line for [Claude Code](https://claude.ai/code), writ
 
 ## Features
 
-- Nerd Font icons for each element (optional, on by default)
+- Nerd Font icons with multiple icon sets (Octicons, Font Awesome)
 - Braille-dot context gauge with color-coded fill (green < 50%, yellow 50-79%, red 80%+)
 - Model name, version, session cost, token counts, lines changed, API wait time, working directory
 - Cache statistics (read/write token counts)
@@ -28,7 +28,15 @@ The binary is at `target/release/claude-bar`.
 
 ## Setup
 
-Add to `~/.claude/settings.json`:
+Automatic:
+
+```bash
+claude-bar --setup
+```
+
+This adds the `statusLine` entry to `~/.claude/settings.json` pointing to the current binary. Restart Claude Code to apply.
+
+Or manually add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -74,43 +82,46 @@ Pick individual elements with `--elements` or a comma-separated env var:
 }
 ```
 
-### Icons
+### Icon sets
 
-Nerd Font icons are shown by default. Disable with:
+Icons are shown by default using Octicons. Switch sets with `--icon-set` or `CLAUDE_BAR_ICON_SET` env var:
 
-- `--no-icons` flag
-- `"CLAUDE_BAR_ICONS": "false"` in the settings.json `env` block
+| Set           | Flag                    | Env var                          |
+|---------------|-------------------------|----------------------------------|
+| Octicons      | `--icon-set octicons`   | `CLAUDE_BAR_ICON_SET=octicons`   |
+| Font Awesome  | `--icon-set fa`         | `CLAUDE_BAR_ICON_SET=fa`         |
+| None          | `--no-icons`            | `CLAUDE_BAR_ICONS=false`         |
 
 ### Available elements
 
-| Element              | Icon | Description                           |
-|----------------------|------|---------------------------------------|
-| `model`              | 󱚣    | Model display name (e.g. Opus 4.6)   |
-| `version`            |     | Claude Code version                   |
-| `gauge`              | 󰹰    | Braille-dot context usage bar         |
-| `context` / `ctx`    | 󰈁    | Context usage percentage              |
-| `tokens`             | 󰒠    | Input/output token counts             |
-| `cache`              |     | Cache read/write token counts         |
-| `cost`               |     | Session cost in USD                   |
-| `lines`              | 󰷈    | Lines added/removed this session      |
-| `duration` / `time`  |     | API wait time                         |
-| `cwd`                |     | Current working directory (shortened) |
-| `project` / `project_dir` |  | Project root directory (shortened)   |
-| `style` / `output_style`  |  | Output style (hidden when "default") |
+| Element              | Description                           |
+|----------------------|---------------------------------------|
+| `model`              | Model display name (e.g. Opus 4.6)   |
+| `version`            | Claude Code version                   |
+| `gauge`              | Braille-dot context usage bar         |
+| `context` / `ctx`    | Context usage percentage              |
+| `tokens`             | Input/output token counts             |
+| `cache`              | Cache read/write token counts         |
+| `cost`               | Session cost in USD                   |
+| `lines`              | Lines added/removed this session      |
+| `duration` / `time`  | API wait time                         |
+| `cwd`                | Current working directory (shortened) |
+| `project` / `project_dir` | Project root directory (shortened)   |
+| `style` / `output_style`  | Output style (hidden when "default") |
 
 ## CLI usage
 
 ```
-claude-bar --help              # Full help
-claude-bar --list              # Show presets and elements
-claude-bar --demo              # Render with sample data (no stdin needed)
-claude-bar --demo --preset full        # Preview a preset
-claude-bar --demo --no-icons           # Preview without icons
+claude-bar --setup                        # Auto-configure ~/.claude/settings.json
+claude-bar --help                         # Full help
+claude-bar --list                         # Show presets, elements, and icon sets
+claude-bar --demo                         # Render with sample data (no stdin needed)
+claude-bar --demo --preset full           # Preview a preset
+claude-bar --demo --no-icons              # Preview without icons
+claude-bar --demo --icon-set fa           # Preview with Font Awesome icons
 claude-bar --demo --elements model,gauge,ctx  # Preview custom layout
-claude-bar --preset compact    # Use a preset (reads stdin)
-claude-bar --elements model,gauge,ctx,cost     # Custom elements (reads stdin)
 ```
 
 ## How it works
 
-Claude Code pipes a JSON object to stdin on each status line update. The binary parses it and renders the selected elements with ANSI color codes. The JSON includes fields like model info, context window usage, session cost, and workspace paths.
+Claude Code pipes a JSON object to stdin on each status line update. The binary parses it and renders the selected elements with ANSI color codes. The JSON includes fields like model info, context window usage, token counts, cache stats, session cost, and workspace paths.

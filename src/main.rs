@@ -2,6 +2,7 @@ mod config;
 mod format;
 mod input;
 mod render;
+mod setup;
 
 use clap::Parser;
 use config::Cli;
@@ -9,6 +10,11 @@ use std::io::Read;
 
 fn main() {
     let cli = Cli::parse();
+
+    if cli.setup {
+        setup::run();
+        return;
+    }
 
     if cli.list {
         config::print_list();

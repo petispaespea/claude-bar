@@ -65,6 +65,9 @@ pub struct Cli {
 
     #[arg(long, help = "Hide Nerd Font icons from elements")]
     pub no_icons: bool,
+
+    #[arg(long, help = "Render with sample data (no stdin required)")]
+    pub demo: bool,
 }
 
 fn preset_elements(name: &str) -> Option<Vec<Element>> {

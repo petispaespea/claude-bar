@@ -48,6 +48,24 @@ pub struct Workspace {
     pub project_dir: Option<String>,
 }
 
+fn demo_input() -> Input {
+    Input {
+        model: Some(Model { display_name: Some("Opus 4.6".into()) }),
+        context_window: Some(ContextWindow { used_percentage: Some(34.0) }),
+        cost: Some(Cost {
+            total_cost_usd: Some(5.24),
+            total_lines_added: Some(245),
+            total_lines_removed: Some(9),
+            total_api_duration_ms: Some(628_205),
+        }),
+        cwd: Some("/Users/demo/Git/my-project".into()),
+        version: Some("2.1.63".into()),
+        exceeds_200k_tokens: Some(false),
+        output_style: Some(OutputStyle { name: Some("default".into()) }),
+        workspace: Some(Workspace { project_dir: Some("/Users/demo/Git/my-project".into()) }),
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -59,14 +77,17 @@ fn main() {
     let elements = resolve_elements(&cli);
     let show_icons = resolve_icons(&cli);
 
-    let mut buf = String::new();
-    if std::io::stdin().read_to_string(&mut buf).is_err() {
-        return;
-    }
-
-    let input: Input = match serde_json::from_str(&buf) {
-        Ok(v) => v,
-        Err(_) => return,
+    let input = if cli.demo {
+        demo_input()
+    } else {
+        let mut buf = String::new();
+        if std::io::stdin().read_to_string(&mut buf).is_err() {
+            return;
+        }
+        match serde_json::from_str(&buf) {
+            Ok(v) => v,
+            Err(_) => return,
+        }
     };
 
     let parts: Vec<String> = elements

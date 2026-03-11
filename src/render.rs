@@ -47,7 +47,7 @@ fn pct_color(pct: f64) -> &'static str {
 
 fn icon(elem: Element) -> &'static str {
     match elem {
-        Element::Model => "\u{e99a} ",
+        Element::Model => "\u{f16a3} ",
         Element::Version => "\u{f412} ",
         Element::Gauge => "\u{f0e70} ",
         Element::Context => "\u{f0201} ",

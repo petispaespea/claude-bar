@@ -42,23 +42,15 @@ const ALL_ELEMENTS: &[Element] = &[
 #[command(
     name = "claude-bar",
     about = "Configurable status line for Claude Code",
-    long_about = "Renders a configurable status line for Claude Code.\n\n\
-        Reads JSON from stdin (provided by Claude Code) and outputs a \
-        formatted single-line status with model info, context usage, \
-        cost, and more.\n\n\
-        SETUP\n  \
-        Add to ~/.claude/settings.json:\n    \
-        \"statusLine\": {\n      \
-        \"type\": \"command\",\n      \
-        \"command\": \"/path/to/claude-bar\"\n    \
-        }\n\n\
+    long_about = "Configurable status line for Claude Code.\n\n\
+        Run --setup to configure, or --demo to preview.\n\n\
         Configuration priority: CLI flags > CLAUDE_BAR env var > default preset"
 )]
 pub struct Cli {
     #[arg(short, long, value_name = "NAME", help = "Preset: minimal, compact, default, full")]
     pub preset: Option<String>,
 
-    #[arg(short, long, value_name = "LIST", help = "Comma-separated elements")]
+    #[arg(short, long, value_name = "LIST", help = "Comma-separated elements (model, version, gauge, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style)")]
     pub elements: Option<String>,
 
     #[arg(long, help = "List available elements and presets")]

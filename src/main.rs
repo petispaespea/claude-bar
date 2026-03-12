@@ -11,6 +11,20 @@ use std::io::Read;
 fn main() {
     let cli = Cli::parse();
 
+    if let Some(ref shell) = cli.completions {
+        let shell = shell.parse::<clap_complete::Shell>().unwrap_or_else(|_| {
+            eprintln!("Unknown shell: {shell}. Use bash, zsh, fish, elvish or powershell.");
+            std::process::exit(1);
+        });
+        clap_complete::generate(
+            shell,
+            &mut config::build_cli(),
+            "claude-bar",
+            &mut std::io::stdout(),
+        );
+        return;
+    }
+
     if cli.setup {
         setup::run();
         return;

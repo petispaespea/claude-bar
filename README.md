@@ -96,5 +96,6 @@ claude-bar --demo --elements model,gauge,ctx  # Preview a custom layout
 claude-bar --demo --icon-set fa               # Preview Font Awesome icons
 claude-bar --demo --no-icons                  # Preview without icons
 claude-bar --list                             # Show all presets, elements, icon sets
+claude-bar --completions bash                 # Generate shell completions
 claude-bar --help                             # Full usage info
 ```

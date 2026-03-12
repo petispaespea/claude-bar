@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Element {
@@ -75,6 +75,13 @@ pub struct Cli {
 
     #[arg(long, help = "Add statusLine to ~/.claude/settings.json")]
     pub setup: bool,
+
+    #[arg(long, value_name = "SHELL", help = "Generate shell completions (bash, zsh, fish, elvish, powershell)")]
+    pub completions: Option<String>,
+}
+
+pub fn build_cli() -> clap::Command {
+    Cli::command()
 }
 
 fn preset_elements(name: &str) -> Option<Vec<Element>> {

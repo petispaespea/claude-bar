@@ -9,6 +9,14 @@ A configurable status line for [Claude Code](https://docs.anthropic.com/en/docs/
 ## Quick start
 
 ```bash
+brew tap petispaespea/tap
+brew install claude-bar
+claude-bar --setup
+```
+
+Or build from source:
+
+```bash
 git clone https://github.com/petispaespea/claude-bar.git
 cd claude-bar
 cargo build --release

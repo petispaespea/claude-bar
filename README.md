@@ -65,7 +65,7 @@ Cherry-pick elements with `--elements` or a comma-separated `CLAUDE_BAR` value:
 |---------------|---------------------------------------------------------|
 | Octicons      | default, or `--icon-set octicons`                       |
 | Font Awesome  | `--icon-set fa` or `CLAUDE_BAR_ICON_SET=fa`             |
-| None          | `--no-icons` or `CLAUDE_BAR_ICONS=false`                |
+| None          | `--no-icons` or `CLAUDE_BAR_ICON_SET=none`                |
 
 ## Elements
 

@@ -67,7 +67,7 @@ pub struct Cli {
     #[arg(long, help = "Hide Nerd Font icons")]
     pub no_icons: bool,
 
-    #[arg(long = "icon-set", value_name = "SET", help = "Icon set: octicons (default), fontawesome")]
+    #[arg(long = "icon-set", value_name = "SET", help = "Icon set: octicons (default), fontawesome/fa, none/off")]
     pub icon_set: Option<String>,
 
     #[arg(long, help = "Render with sample data (no stdin required)")]
@@ -142,12 +142,13 @@ pub fn resolve_elements(cli: &Cli) -> Vec<Element> {
 }
 
 pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
-    if cli.no_icons || env("CLAUDE_BAR_ICONS").is_some_and(|v| v == "0" || v == "false") {
+    if cli.no_icons {
         return IconMode::None;
     }
     let env_set = env("CLAUDE_BAR_ICON_SET");
     let set = cli.icon_set.as_deref().or(env_set.as_deref());
     match set {
+        Some("none" | "off") => IconMode::None,
         Some("fontawesome" | "fa") => IconMode::FontAwesome,
         _ => IconMode::Octicons,
     }
@@ -180,5 +181,6 @@ ELEMENTS
 ICON SETS
   octicons       Octicons (default)
   fontawesome    Font Awesome (alias: fa)
+  none, off      No icons (text prefixes for paths)
 ");
 }

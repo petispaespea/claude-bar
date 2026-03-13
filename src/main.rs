@@ -51,7 +51,7 @@ fn main() {
         }
     }
 
-    let config = toml_config::load_config(None);
+    let config = toml_config::load_config(cli.config.as_ref().map(|p| p.to_str().unwrap()));
     let elements = config::resolve_elements(&cli, Some(&config.layout.elements));
     let icon_mode = config::resolve_icon_mode(&cli);
 

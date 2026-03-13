@@ -89,6 +89,9 @@ pub struct Cli {
     )]
     pub completions: Option<String>,
 
+    #[arg(long, help = "Path to TOML config file")]
+    pub config: Option<std::path::PathBuf>,
+
     #[arg(long, help = "Print default TOML config to stdout")]
     pub print_default_config: bool,
 }
@@ -354,6 +357,7 @@ mod tests {
             setup: false,
             completions: None,
             print_default_config: false,
+            config: None,
         };
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 2);
@@ -373,6 +377,7 @@ mod tests {
             setup: false,
             completions: None,
             print_default_config: false,
+            config: None,
         };
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 5);
@@ -391,6 +396,7 @@ mod tests {
             setup: false,
             completions: None,
             print_default_config: false,
+            config: None,
         };
         assert_eq!(resolve_icon_mode(&cli), IconMode::None);
     }
@@ -407,6 +413,7 @@ mod tests {
             setup: false,
             completions: None,
             print_default_config: false,
+            config: None,
         };
         assert_eq!(resolve_icon_mode(&cli), IconMode::FontAwesome);
     }
@@ -423,6 +430,7 @@ mod tests {
             setup: false,
             completions: None,
             print_default_config: false,
+            config: None,
         };
         assert_eq!(resolve_icon_mode(&cli), IconMode::Octicons);
     }

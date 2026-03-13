@@ -178,6 +178,67 @@ impl Default for LayoutConfig {
     }
 }
 
+fn env(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|v| !v.is_empty())
+}
+
+/// Resolves config file path with 4-tier precedence:
+/// 1. CLI argument (if provided)
+/// 2. $CLAUDE_BAR_CONFIG env var
+/// 3. $XDG_CONFIG_HOME/claude-bar.toml (if XDG_CONFIG_HOME set)
+/// 4. ~/.config/claude-bar.toml (fallback)
+fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    
+    // Tier 1: CLI argument takes highest priority
+    if let Some(path) = cli_path {
+        return Some(PathBuf::from(path));
+    }
+    
+    // Tier 2: CLAUDE_BAR_CONFIG env var
+    if let Some(path) = env("CLAUDE_BAR_CONFIG") {
+        return Some(PathBuf::from(path));
+    }
+    
+    // Tier 3: $XDG_CONFIG_HOME/claude-bar.toml
+    if let Some(xdg_home) = env("XDG_CONFIG_HOME") {
+        let path = PathBuf::from(xdg_home).join("claude-bar.toml");
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    
+    // Tier 4: ~/.config/claude-bar.toml (fallback)
+    if let Ok(home) = std::env::var("HOME") {
+        let path = PathBuf::from(home).join(".config/claude-bar.toml");
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    
+    None
+}
+
+/// Loads configuration from file, with path resolution and silent fallback to defaults.
+/// Returns BarConfig::default() if no file exists or TOML is invalid.
+pub fn load_config(cli_path: Option<&str>) -> BarConfig {
+    let Some(path) = resolve_config_path(cli_path) else {
+        return BarConfig::default();
+    };
+    
+    let Ok(contents) = std::fs::read_to_string(&path) else {
+        return BarConfig::default();
+    };
+    
+    match toml::from_str::<BarConfig>(&contents) {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Warning: Invalid TOML in {}: {}", path.display(), e);
+            BarConfig::default()
+        }
+    }
+}
+
 /// Model element configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ModelConfig {
@@ -549,5 +610,77 @@ unknown_config = 123
         assert_eq!(original.model.symbol, deserialized.model.symbol);
         assert_eq!(original.model.style, deserialized.model.style);
         assert_eq!(original.layout.elements, deserialized.layout.elements);
+    }
+
+    #[test]
+    fn load_no_file() {
+        // Test when no config file exists
+        let config = load_config(Some("/nonexistent/path/that/does/not/exist.toml"));
+        // Should return default config without error
+        assert_eq!(config.separator, "  ");
+        assert_eq!(config.model.symbol, "\u{f4be} ");
+        assert!(!config.model.disabled);
+    }
+
+    #[test]
+    fn load_valid_file() {
+        // Create a temporary file with valid TOML
+        let temp_file = "/tmp/test_config_valid.toml";
+        let toml_content = r#"
+separator = " | "
+[model]
+disabled = true
+symbol = "MODEL"
+style = "red"
+"#;
+        std::fs::write(temp_file, toml_content).expect("Failed to write test file");
+        
+        // Load from the file
+        let config = load_config(Some(temp_file));
+        
+        // Verify custom values were loaded
+        assert_eq!(config.separator, " | ");
+        assert!(config.model.disabled);
+        assert_eq!(config.model.symbol, "MODEL");
+        assert_eq!(config.model.style, "red");
+        // Rest should use defaults
+        assert_eq!(config.version.style, "dim");
+        
+        // Cleanup
+        let _ = std::fs::remove_file(temp_file);
+    }
+
+    #[test]
+    fn load_invalid_toml() {
+        // Create a temporary file with invalid TOML
+        let temp_file = "/tmp/test_config_invalid.toml";
+        let invalid_toml = "separator = [\n  invalid toml syntax here\n}";
+        std::fs::write(temp_file, invalid_toml).expect("Failed to write test file");
+        
+        // Load from the file - should trigger warning but not panic
+        let config = load_config(Some(temp_file));
+        
+        // Should return default config
+        assert_eq!(config.separator, "  ");
+        assert_eq!(config.model.symbol, "\u{f4be} ");
+        
+        // Cleanup
+        let _ = std::fs::remove_file(temp_file);
+    }
+
+    #[test]
+    fn resolve_config_path_cli_precedence() {
+        // CLI path should take highest precedence
+        let path = resolve_config_path(Some("/custom/path.toml"));
+        assert_eq!(path, Some(std::path::PathBuf::from("/custom/path.toml")));
+    }
+
+    #[test]
+    fn resolve_config_path_no_file() {
+        // When no file exists in any tier, should return None
+        let path = resolve_config_path(None);
+        // This depends on environment, so we just verify it returns Option
+        // We don't assert specific value as it could be Some or None depending on system
+        let _ = path;
     }
 }

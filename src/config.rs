@@ -115,7 +115,7 @@ fn env(key: &str) -> Option<String> {
     std::env::var(key).ok().filter(|v| !v.is_empty())
 }
 
-pub fn resolve_elements(cli: &Cli) -> Vec<Element> {
+pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Element> {
     if let Some(ref spec) = cli.elements {
         return parse_elements(spec);
     }
@@ -127,10 +127,16 @@ pub fn resolve_elements(cli: &Cli) -> Vec<Element> {
     }
     let val = env("CLAUDE_BAR").unwrap_or_else(|| "default".into());
     if val.contains(',') {
-        parse_elements(&val)
-    } else {
-        preset_elements(&val).unwrap_or_else(|| ALL_ELEMENTS.to_vec())
+        return parse_elements(&val);
     }
+    if let Some(elems) = preset_elements(&val) {
+        return elems;
+    }
+    // Use TOML layout if available and no CLI/env override
+    if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
+        return parse_elements(&layout.join(","));
+    }
+    ALL_ELEMENTS.to_vec()
 }
 
 pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
@@ -313,7 +319,7 @@ mod tests {
             setup: false,
             completions: None,
         };
-        let result = resolve_elements(&cli);
+        let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], Element::Model);
         assert_eq!(result[1], Element::Cost);
@@ -331,7 +337,7 @@ mod tests {
             setup: false,
             completions: None,
         };
-        let result = resolve_elements(&cli);
+        let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 5);
         assert!(result.contains(&Element::Cost));
     }

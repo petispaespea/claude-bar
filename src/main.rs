@@ -37,7 +37,8 @@ fn main() {
         return;
     }
 
-    let elements = config::resolve_elements(&cli);
+    let config = toml_config::load_config(None);
+    let elements = config::resolve_elements(&cli, Some(&config.layout.elements));
     let icon_mode = config::resolve_icon_mode(&cli);
 
     let input: input::Input = if cli.demo {
@@ -57,7 +58,7 @@ fn main() {
         .iter()
         .filter_map(|e| render::render(*e, &input, icon_mode))
         .collect::<Vec<_>>()
-        .join("  ");
+        .join(&config.separator);
 
     print!("{out}");
 }

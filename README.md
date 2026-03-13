@@ -75,6 +75,55 @@ Cherry-pick elements with `--elements` or a comma-separated `CLAUDE_BAR` value:
 | Font Awesome  | `--icon-set fa` or `CLAUDE_BAR_ICON_SET=fa`             |
 | None          | `--no-icons` or `CLAUDE_BAR_ICON_SET=none`                |
 
+## TOML Configuration
+
+Configuration can also be supplied via a TOML file. The default location is
+`~/.config/claude-bar.toml`. The path resolution follows this precedence, from
+highest to lowest:
+
+1. `--config <path>` CLI flag
+2. `CLAUDE_BAR_CONFIG` environment variable
+3. `$XDG_CONFIG_HOME/claude-bar.toml` (if set)
+4. `~/.config/claude-bar.toml` (fallback)
+
+To generate a starter config, run:
+
+```bash
+claude-bar --print-default-config > ~/.config/claude-bar.toml
+```
+
+Example TOML (valid and copy-pasteable):
+
+```toml
+separator = "  "
+
+[layout]
+elements = ["model", "gauge", "context", "tokens", "cwd"]
+
+[model]
+disabled = false
+symbol = " "
+style = "cyan"
+```
+
+Per-module fields
+
+- `disabled` (bool): when true the module is not rendered
+- `symbol` (string): icon or text prefixed to the module output
+- `style` (string): space-separated style vocabulary (see below)
+
+Style vocabulary
+
+Colors: black, red, green, yellow, blue, magenta, cyan, white
+
+Modifiers: bold, dim, italic, underline
+
+Styles are space-separated, for example: `style = "bold red"` or
+`style = "dim cyan"`.
+
+Note: the `gauge`, `context`, and `lines` modules use dynamic color logic and
+ignore the `style` field. Those modules choose color based on runtime values.
+
 ## Elements
 
 | Name                       | Description                                |
@@ -98,6 +147,8 @@ The gauge uses color-coded thresholds: green (< 50%), yellow (50-79%), red (80%+
 
 ```
 claude-bar --setup                            # Configure ~/.claude/settings.json
+claude-bar --print-default-config             # Generate default TOML config
+claude-bar --config <path> --demo             # Use custom config file
 claude-bar --demo                             # Preview with sample data
 claude-bar --demo --preset full               # Preview a specific preset
 claude-bar --demo --elements model,gauge,ctx  # Preview a custom layout

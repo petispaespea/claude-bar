@@ -3,8 +3,8 @@ use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::input::Input;
 
 const BRAILLE: [char; 9] = [
-    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}',
-    '\u{28C7}', '\u{28E7}', '\u{28F7}', '\u{28FF}',
+    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}', '\u{28C7}', '\u{28E7}', '\u{28F7}',
+    '\u{28FF}',
 ];
 
 const CYAN: &str = "\x1b[36m";
@@ -35,109 +35,315 @@ fn pct_color(pct: f64) -> &'static str {
     }
 }
 
-fn icon(elem: Element, mode: IconMode) -> &'static str {
-    match mode {
-        IconMode::None => match elem {
-            Element::Duration => "api:",
-            Element::Cwd => "cwd:",
-            Element::ProjectDir => "proj:",
-            _ => "",
-        },
-        IconMode::Octicons => match elem {
-            Element::Model => "\u{f4be} ",
-            Element::Version => "\u{f412} ",
-            Element::Gauge => "\u{f4ed} ",
-            Element::Context => "\u{f463} ",
-            Element::Tokens => "\u{f4df} ",
-            Element::Cache => "\u{f49b} ",
-            Element::Cost => "\u{f439} ",
-            Element::Lines => "\u{f4d2} ",
-            Element::Duration => "\u{f4e3} ",
-            Element::Cwd => "\u{f413} ",
-            Element::ProjectDir => "\u{f46d} ",
-            Element::OutputStyle => "\u{f48f} ",
-        },
-        IconMode::FontAwesome => match elem {
-            Element::Model => "\u{ee0d} ",
-            Element::Version => "\u{f02b} ",
-            Element::Gauge => "\u{ef0d} ",
-            Element::Context => "\u{eeb2} ",
-            Element::Tokens => "\u{f292} ",
-            Element::Cache => "\u{f1c0} ",
-            Element::Cost => "\u{f09d} ",
-            Element::Lines => "\u{f05f} ",
-            Element::Duration => "\u{f254} ",
-            Element::Cwd => "\u{f114} ",
-            Element::ProjectDir => "\u{f015} ",
-            Element::OutputStyle => "\u{f1fc} ",
-        },
+pub trait Module {
+    #[allow(dead_code)]
+    fn element(&self) -> Element;
+    fn default_icon(&self, mode: IconMode) -> &'static str;
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String>;
+}
+
+pub struct ModelModule;
+
+impl Module for ModelModule {
+    fn element(&self) -> Element {
+        Element::Model
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f4be} ",
+            IconMode::FontAwesome => "\u{ee0d} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let name = input.model.as_ref()?.display_name.as_ref()?;
+        Some(format!("{i}{CYAN}{name}{RST}"))
+    }
+}
+
+pub struct VersionModule;
+
+impl Module for VersionModule {
+    fn element(&self) -> Element {
+        Element::Version
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f412} ",
+            IconMode::FontAwesome => "\u{f02b} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let v = input.version.as_ref()?;
+        Some(format!("{i}{DIM}v{v}{RST}"))
+    }
+}
+
+pub struct GaugeModule;
+
+impl Module for GaugeModule {
+    fn element(&self) -> Element {
+        Element::Gauge
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f4ed} ",
+            IconMode::FontAwesome => "\u{ef0d} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let pct = input.context_window.as_ref()?.used_percentage?;
+        let g = gauge(pct, 10, pct_color(pct));
+        let mut out = format!("{i}{g}");
+        if input.exceeds_200k_tokens.unwrap_or(false) {
+            out.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RST}"));
+        }
+        Some(out)
+    }
+}
+
+pub struct ContextModule;
+
+impl Module for ContextModule {
+    fn element(&self) -> Element {
+        Element::Context
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f463} ",
+            IconMode::FontAwesome => "\u{eeb2} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let pct = input.context_window.as_ref()?.used_percentage?;
+        Some(format!("{i}{}{pct:.0}%{RST}", pct_color(pct)))
+    }
+}
+
+pub struct TokensModule;
+
+impl Module for TokensModule {
+    fn element(&self) -> Element {
+        Element::Tokens
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f4df} ",
+            IconMode::FontAwesome => "\u{f292} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let cw = input.context_window.as_ref()?;
+        let inp = format_tokens(cw.total_input_tokens?);
+        let out = format_tokens(cw.total_output_tokens?);
+        Some(format!("{i}{DIM}{inp}/{out}{RST}"))
+    }
+}
+
+pub struct CacheModule;
+
+impl Module for CacheModule {
+    fn element(&self) -> Element {
+        Element::Cache
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f49b} ",
+            IconMode::FontAwesome => "\u{f1c0} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let u = input.context_window.as_ref()?.current_usage.as_ref()?;
+        let r = u.cache_read_input_tokens.unwrap_or(0);
+        let w = u.cache_creation_input_tokens.unwrap_or(0);
+        if r == 0 && w == 0 {
+            return None;
+        }
+        Some(format!(
+            "{i}{DIM}r:{} w:{}{RST}",
+            format_tokens(r),
+            format_tokens(w)
+        ))
+    }
+}
+
+pub struct CostModule;
+
+impl Module for CostModule {
+    fn element(&self) -> Element {
+        Element::Cost
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f439} ",
+            IconMode::FontAwesome => "\u{f09d} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let c = input.cost.as_ref()?.total_cost_usd?;
+        Some(format!("{i}{DIM}${c:.2}{RST}"))
+    }
+}
+
+pub struct LinesModule;
+
+impl Module for LinesModule {
+    fn element(&self) -> Element {
+        Element::Lines
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f4d2} ",
+            IconMode::FontAwesome => "\u{f05f} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let cost = input.cost.as_ref()?;
+        let a = cost.total_lines_added.unwrap_or(0);
+        let d = cost.total_lines_removed.unwrap_or(0);
+        if a == 0 && d == 0 {
+            return None;
+        }
+        Some(format!("{i}{GREEN}+{a}{RST}/{RED}-{d}{RST}"))
+    }
+}
+
+pub struct DurationModule;
+
+impl Module for DurationModule {
+    fn element(&self) -> Element {
+        Element::Duration
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "api:",
+            IconMode::Octicons => "\u{f4e3} ",
+            IconMode::FontAwesome => "\u{f254} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let ms = input.cost.as_ref()?.total_api_duration_ms?;
+        Some(format!("{i}{DIM}{}{RST}", format_duration(ms)))
+    }
+}
+
+pub struct CwdModule;
+
+impl Module for CwdModule {
+    fn element(&self) -> Element {
+        Element::Cwd
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "cwd:",
+            IconMode::Octicons => "\u{f413} ",
+            IconMode::FontAwesome => "\u{f114} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let p = input.cwd.as_ref()?;
+        Some(format!("{i}{DIM}{}{RST}", shorten_path(p)))
+    }
+}
+
+pub struct ProjectDirModule;
+
+impl Module for ProjectDirModule {
+    fn element(&self) -> Element {
+        Element::ProjectDir
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "proj:",
+            IconMode::Octicons => "\u{f46d} ",
+            IconMode::FontAwesome => "\u{f015} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let p = input.workspace.as_ref()?.project_dir.as_ref()?;
+        Some(format!("{i}{DIM}{}{RST}", shorten_path(p)))
+    }
+}
+
+pub struct OutputStyleModule;
+
+impl Module for OutputStyleModule {
+    fn element(&self) -> Element {
+        Element::OutputStyle
+    }
+
+    fn default_icon(&self, mode: IconMode) -> &'static str {
+        match mode {
+            IconMode::None => "",
+            IconMode::Octicons => "\u{f48f} ",
+            IconMode::FontAwesome => "\u{f1fc} ",
+        }
+    }
+
+    fn render(&self, input: &Input, mode: IconMode) -> Option<String> {
+        let i = self.default_icon(mode);
+        let name = input.output_style.as_ref()?.name.as_ref()?;
+        if name == "default" {
+            return None;
+        }
+        Some(format!("{i}{DIM}[{name}]{RST}"))
     }
 }
 
 pub fn render(elem: Element, input: &Input, mode: IconMode) -> Option<String> {
-    let i = icon(elem, mode);
-    match elem {
-        Element::Model => {
-            let name = input.model.as_ref()?.display_name.as_ref()?;
-            Some(format!("{i}{CYAN}{name}{RST}"))
-        }
-        Element::Version => {
-            let v = input.version.as_ref()?;
-            Some(format!("{i}{DIM}v{v}{RST}"))
-        }
-        Element::Gauge => {
-            let pct = input.context_window.as_ref()?.used_percentage?;
-            let g = gauge(pct, 10, pct_color(pct));
-            let mut out = format!("{i}{g}");
-            if input.exceeds_200k_tokens.unwrap_or(false) {
-                out.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RST}"));
-            }
-            Some(out)
-        }
-        Element::Context => {
-            let pct = input.context_window.as_ref()?.used_percentage?;
-            Some(format!("{i}{}{pct:.0}%{RST}", pct_color(pct)))
-        }
-        Element::Tokens => {
-            let cw = input.context_window.as_ref()?;
-            let inp = format_tokens(cw.total_input_tokens?);
-            let out = format_tokens(cw.total_output_tokens?);
-            Some(format!("{i}{DIM}{inp}/{out}{RST}"))
-        }
-        Element::Cache => {
-            let u = input.context_window.as_ref()?.current_usage.as_ref()?;
-            let r = u.cache_read_input_tokens.unwrap_or(0);
-            let w = u.cache_creation_input_tokens.unwrap_or(0);
-            if r == 0 && w == 0 { return None; }
-            Some(format!("{i}{DIM}r:{} w:{}{RST}", format_tokens(r), format_tokens(w)))
-        }
-        Element::Cost => {
-            let c = input.cost.as_ref()?.total_cost_usd?;
-            Some(format!("{i}{DIM}${c:.2}{RST}"))
-        }
-        Element::Lines => {
-            let cost = input.cost.as_ref()?;
-            let a = cost.total_lines_added.unwrap_or(0);
-            let d = cost.total_lines_removed.unwrap_or(0);
-            if a == 0 && d == 0 { return None; }
-            Some(format!("{i}{GREEN}+{a}{RST}/{RED}-{d}{RST}"))
-        }
-        Element::Duration => {
-            let ms = input.cost.as_ref()?.total_api_duration_ms?;
-            Some(format!("{i}{DIM}{}{RST}", format_duration(ms)))
-        }
-        Element::Cwd => {
-            let p = input.cwd.as_ref()?;
-            Some(format!("{i}{DIM}{}{RST}", shorten_path(p)))
-        }
-        Element::ProjectDir => {
-            let p = input.workspace.as_ref()?.project_dir.as_ref()?;
-            Some(format!("{i}{DIM}{}{RST}", shorten_path(p)))
-        }
-        Element::OutputStyle => {
-            let name = input.output_style.as_ref()?.name.as_ref()?;
-            if name == "default" { return None; }
-            Some(format!("{i}{DIM}[{name}]{RST}"))
-        }
-    }
+    let module: Box<dyn Module> = match elem {
+        Element::Model => Box::new(ModelModule),
+        Element::Version => Box::new(VersionModule),
+        Element::Gauge => Box::new(GaugeModule),
+        Element::Context => Box::new(ContextModule),
+        Element::Tokens => Box::new(TokensModule),
+        Element::Cache => Box::new(CacheModule),
+        Element::Cost => Box::new(CostModule),
+        Element::Lines => Box::new(LinesModule),
+        Element::Duration => Box::new(DurationModule),
+        Element::Cwd => Box::new(CwdModule),
+        Element::ProjectDir => Box::new(ProjectDirModule),
+        Element::OutputStyle => Box::new(OutputStyleModule),
+    };
+    module.render(input, mode)
 }

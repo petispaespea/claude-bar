@@ -44,7 +44,16 @@ const ALL_ELEMENTS: &[Element] = &[
     about = "Configurable status line for Claude Code",
     long_about = "Configurable status line for Claude Code.\n\n\
         Run --setup to configure, or --demo to preview.\n\n\
-        Configuration priority: CLI flags > CLAUDE_BAR env var > default preset"
+        Configuration priority (highest to lowest):\n  \
+        1. CLI flags (--elements, --preset, --icon-set)\n  \
+        2. Environment variables (CLAUDE_BAR, CLAUDE_BAR_ICON_SET)\n  \
+        3. TOML config file\n  \
+        4. Built-in defaults\n\n\
+        Config file resolution:\n  \
+        1. --config <path>\n  \
+        2. $CLAUDE_BAR_CONFIG\n  \
+        3. $XDG_CONFIG_HOME/claude-bar.toml\n  \
+        4. ~/.config/claude-bar.toml"
 )]
 pub struct Cli {
     #[arg(

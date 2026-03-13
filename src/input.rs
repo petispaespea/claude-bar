@@ -51,7 +51,9 @@ pub struct Workspace {
 
 pub fn demo() -> Input {
     Input {
-        model: Some(Model { display_name: Some("Opus 4.6".into()) }),
+        model: Some(Model {
+            display_name: Some("Opus 4.6".into()),
+        }),
         context_window: Some(ContextWindow {
             used_percentage: Some(30.0),
             total_input_tokens: Some(3931),
@@ -70,15 +72,18 @@ pub fn demo() -> Input {
         cwd: Some("/Users/demo/Git/my-project".into()),
         version: Some("2.1.69".into()),
         exceeds_200k_tokens: Some(false),
-        output_style: Some(OutputStyle { name: Some("default".into()) }),
-        workspace: Some(Workspace { project_dir: Some("/Users/demo/Git/my-project".into()) }),
+        output_style: Some(OutputStyle {
+            name: Some("default".into()),
+        }),
+        workspace: Some(Workspace {
+            project_dir: Some("/Users/demo/Git/my-project".into()),
+        }),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn test_demo_input_structure() {

@@ -35,7 +35,6 @@ pub fn shorten_path(path: &str) -> String {
     format!("…/{}", last_two.join("/"))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

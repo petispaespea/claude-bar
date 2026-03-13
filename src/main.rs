@@ -56,7 +56,7 @@ fn main() {
 
     let out: String = elements
         .iter()
-        .filter_map(|e| render::render(*e, &input, icon_mode))
+        .filter_map(|e| render::render(*e, &input, icon_mode, &config))
         .collect::<Vec<_>>()
         .join(&config.separator);
 

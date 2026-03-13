@@ -189,17 +189,17 @@ fn env(key: &str) -> Option<String> {
 /// 4. ~/.config/claude-bar.toml (fallback)
 fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
     use std::path::PathBuf;
-    
+
     // Tier 1: CLI argument takes highest priority
     if let Some(path) = cli_path {
         return Some(PathBuf::from(path));
     }
-    
+
     // Tier 2: CLAUDE_BAR_CONFIG env var
     if let Some(path) = env("CLAUDE_BAR_CONFIG") {
         return Some(PathBuf::from(path));
     }
-    
+
     // Tier 3: $XDG_CONFIG_HOME/claude-bar.toml
     if let Some(xdg_home) = env("XDG_CONFIG_HOME") {
         let path = PathBuf::from(xdg_home).join("claude-bar.toml");
@@ -207,7 +207,7 @@ fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
             return Some(path);
         }
     }
-    
+
     // Tier 4: ~/.config/claude-bar.toml (fallback)
     if let Ok(home) = std::env::var("HOME") {
         let path = PathBuf::from(home).join(".config/claude-bar.toml");
@@ -215,7 +215,7 @@ fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
             return Some(path);
         }
     }
-    
+
     None
 }
 
@@ -225,11 +225,11 @@ pub fn load_config(cli_path: Option<&str>) -> BarConfig {
     let Some(path) = resolve_config_path(cli_path) else {
         return BarConfig::default();
     };
-    
+
     let Ok(contents) = std::fs::read_to_string(&path) else {
         return BarConfig::default();
     };
-    
+
     match toml::from_str::<BarConfig>(&contents) {
         Ok(config) => config,
         Err(e) => {
@@ -549,8 +549,8 @@ unknown_config = 123
     fn test_default_layout_matches_all_elements_order() {
         let config = BarConfig::default();
         let expected = vec![
-            "model", "version", "gauge", "context", "tokens", "cache", "cost", "lines",
-            "duration", "cwd", "project", "style",
+            "model", "version", "gauge", "context", "tokens", "cache", "cost", "lines", "duration",
+            "cwd", "project", "style",
         ];
         assert_eq!(config.layout.elements, expected);
     }
@@ -604,7 +604,7 @@ unknown_config = 123
         let original = BarConfig::default();
         let toml_str = toml::to_string(&original).expect("Should serialize");
         let deserialized: BarConfig = toml::from_str(&toml_str).expect("Should deserialize");
-        
+
         assert_eq!(original.separator, deserialized.separator);
         assert_eq!(original.model.disabled, deserialized.model.disabled);
         assert_eq!(original.model.symbol, deserialized.model.symbol);
@@ -634,10 +634,10 @@ symbol = "MODEL"
 style = "red"
 "#;
         std::fs::write(temp_file, toml_content).expect("Failed to write test file");
-        
+
         // Load from the file
         let config = load_config(Some(temp_file));
-        
+
         // Verify custom values were loaded
         assert_eq!(config.separator, " | ");
         assert!(config.model.disabled);
@@ -645,7 +645,7 @@ style = "red"
         assert_eq!(config.model.style, "red");
         // Rest should use defaults
         assert_eq!(config.version.style, "dim");
-        
+
         // Cleanup
         let _ = std::fs::remove_file(temp_file);
     }
@@ -656,14 +656,14 @@ style = "red"
         let temp_file = "/tmp/test_config_invalid.toml";
         let invalid_toml = "separator = [\n  invalid toml syntax here\n}";
         std::fs::write(temp_file, invalid_toml).expect("Failed to write test file");
-        
+
         // Load from the file - should trigger warning but not panic
         let config = load_config(Some(temp_file));
-        
+
         // Should return default config
         assert_eq!(config.separator, "  ");
         assert_eq!(config.model.symbol, "\u{f4be} ");
-        
+
         // Cleanup
         let _ = std::fs::remove_file(temp_file);
     }

@@ -47,10 +47,20 @@ const ALL_ELEMENTS: &[Element] = &[
         Configuration priority: CLI flags > CLAUDE_BAR env var > default preset"
 )]
 pub struct Cli {
-    #[arg(short, long, value_name = "NAME", help = "Preset: minimal, compact, default, full")]
+    #[arg(
+        short,
+        long,
+        value_name = "NAME",
+        help = "Preset: minimal, compact, default, full"
+    )]
     pub preset: Option<String>,
 
-    #[arg(short, long, value_name = "LIST", help = "Comma-separated elements (model, version, gauge, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style)")]
+    #[arg(
+        short,
+        long,
+        value_name = "LIST",
+        help = "Comma-separated elements (model, version, gauge, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style)"
+    )]
     pub elements: Option<String>,
 
     #[arg(long, help = "List available elements and presets")]
@@ -59,7 +69,11 @@ pub struct Cli {
     #[arg(long, help = "Hide Nerd Font icons")]
     pub no_icons: bool,
 
-    #[arg(long = "icon-set", value_name = "SET", help = "Icon set: octicons (default), fontawesome/fa, none/off")]
+    #[arg(
+        long = "icon-set",
+        value_name = "SET",
+        help = "Icon set: octicons (default), fontawesome/fa, none/off"
+    )]
     pub icon_set: Option<String>,
 
     #[arg(long, help = "Render with sample data (no stdin required)")]
@@ -68,7 +82,11 @@ pub struct Cli {
     #[arg(long, help = "Add statusLine to ~/.claude/settings.json")]
     pub setup: bool,
 
-    #[arg(long, value_name = "SHELL", help = "Generate shell completions (bash, zsh, fish, elvish, powershell)")]
+    #[arg(
+        long,
+        value_name = "SHELL",
+        help = "Generate shell completions (bash, zsh, fish, elvish, powershell)"
+    )]
     pub completions: Option<String>,
 }
 
@@ -80,11 +98,21 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Element>> {
     Some(match name {
         "minimal" => vec![Element::Model, Element::Gauge, Element::Context],
         "compact" => vec![
-            Element::Model, Element::Gauge, Element::Context, Element::Cost, Element::Cwd,
+            Element::Model,
+            Element::Gauge,
+            Element::Context,
+            Element::Cost,
+            Element::Cwd,
         ],
         "default" => vec![
-            Element::Model, Element::Gauge, Element::Context, Element::Tokens,
-            Element::Duration, Element::Cwd, Element::ProjectDir, Element::OutputStyle,
+            Element::Model,
+            Element::Gauge,
+            Element::Context,
+            Element::Tokens,
+            Element::Duration,
+            Element::Cwd,
+            Element::ProjectDir,
+            Element::OutputStyle,
         ],
         "full" => ALL_ELEMENTS.to_vec(),
         _ => return None,
@@ -153,7 +181,8 @@ pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
 }
 
 pub fn print_list() {
-    eprint!("\
+    eprint!(
+        "\
 PRESETS
   minimal        model, gauge, context
   compact        model, gauge, context, cost, cwd
@@ -180,7 +209,8 @@ ICON SETS
   octicons       Octicons (default)
   fontawesome    Font Awesome (alias: fa)
   none, off      No icons (text prefixes for paths)
-");
+"
+    );
 }
 
 #[cfg(test)]
@@ -189,7 +219,9 @@ mod tests {
 
     #[test]
     fn test_parse_elements_all_element_names() {
-        let result = parse_elements("model,version,gauge,context,tokens,cache,cost,lines,duration,cwd,project,style");
+        let result = parse_elements(
+            "model,version,gauge,context,tokens,cache,cost,lines,duration,cwd,project,style",
+        );
         assert_eq!(result.len(), 12);
         assert!(result.contains(&Element::Model));
         assert!(result.contains(&Element::Version));
@@ -387,5 +419,3 @@ mod tests {
         assert_eq!(resolve_icon_mode(&cli), IconMode::Octicons);
     }
 }
-
-

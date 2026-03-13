@@ -3,6 +3,7 @@ mod format;
 mod input;
 mod render;
 mod setup;
+mod toml_config;
 
 use clap::Parser;
 use config::Cli;

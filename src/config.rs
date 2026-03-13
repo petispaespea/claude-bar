@@ -88,6 +88,9 @@ pub struct Cli {
         help = "Generate shell completions (bash, zsh, fish, elvish, powershell)"
     )]
     pub completions: Option<String>,
+
+    #[arg(long, help = "Print default TOML config to stdout")]
+    pub print_default_config: bool,
 }
 
 pub fn build_cli() -> clap::Command {
@@ -350,6 +353,7 @@ mod tests {
             demo: false,
             setup: false,
             completions: None,
+            print_default_config: false,
         };
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 2);
@@ -368,6 +372,7 @@ mod tests {
             demo: false,
             setup: false,
             completions: None,
+            print_default_config: false,
         };
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 5);
@@ -385,6 +390,7 @@ mod tests {
             demo: false,
             setup: false,
             completions: None,
+            print_default_config: false,
         };
         assert_eq!(resolve_icon_mode(&cli), IconMode::None);
     }
@@ -400,6 +406,7 @@ mod tests {
             demo: false,
             setup: false,
             completions: None,
+            print_default_config: false,
         };
         assert_eq!(resolve_icon_mode(&cli), IconMode::FontAwesome);
     }
@@ -415,6 +422,7 @@ mod tests {
             demo: false,
             setup: false,
             completions: None,
+            print_default_config: false,
         };
         assert_eq!(resolve_icon_mode(&cli), IconMode::Octicons);
     }

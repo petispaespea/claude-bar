@@ -683,4 +683,70 @@ style = "red"
         // We don't assert specific value as it could be Some or None depending on system
         let _ = path;
     }
+
+    #[test]
+    fn test_default_config_roundtrip_via_toml() {
+        // Serialize default config to TOML string
+        let original = BarConfig::default();
+        let toml_str = toml::to_string_pretty(&original)
+            .expect("Should serialize default config to TOML");
+        
+        // Verify output is not empty
+        assert!(!toml_str.is_empty(), "TOML output should not be empty");
+        
+        // Deserialize back from string
+        let deserialized: BarConfig = toml::from_str(&toml_str)
+            .expect("Should deserialize TOML back to BarConfig");
+        
+        // Verify all fields match the original
+        assert_eq!(original.separator, deserialized.separator);
+        
+        // Verify all module configs
+        assert_eq!(original.model.disabled, deserialized.model.disabled);
+        assert_eq!(original.model.symbol, deserialized.model.symbol);
+        assert_eq!(original.model.style, deserialized.model.style);
+        
+        assert_eq!(original.version.disabled, deserialized.version.disabled);
+        assert_eq!(original.version.symbol, deserialized.version.symbol);
+        assert_eq!(original.version.style, deserialized.version.style);
+        
+        assert_eq!(original.gauge.disabled, deserialized.gauge.disabled);
+        assert_eq!(original.gauge.symbol, deserialized.gauge.symbol);
+        
+        assert_eq!(original.context.disabled, deserialized.context.disabled);
+        assert_eq!(original.context.symbol, deserialized.context.symbol);
+        
+        assert_eq!(original.tokens.disabled, deserialized.tokens.disabled);
+        assert_eq!(original.tokens.symbol, deserialized.tokens.symbol);
+        assert_eq!(original.tokens.style, deserialized.tokens.style);
+        
+        assert_eq!(original.cache.disabled, deserialized.cache.disabled);
+        assert_eq!(original.cache.symbol, deserialized.cache.symbol);
+        assert_eq!(original.cache.style, deserialized.cache.style);
+        
+        assert_eq!(original.cost.disabled, deserialized.cost.disabled);
+        assert_eq!(original.cost.symbol, deserialized.cost.symbol);
+        assert_eq!(original.cost.style, deserialized.cost.style);
+        
+        assert_eq!(original.lines.disabled, deserialized.lines.disabled);
+        assert_eq!(original.lines.symbol, deserialized.lines.symbol);
+        
+        assert_eq!(original.duration.disabled, deserialized.duration.disabled);
+        assert_eq!(original.duration.symbol, deserialized.duration.symbol);
+        assert_eq!(original.duration.style, deserialized.duration.style);
+        
+        assert_eq!(original.cwd.disabled, deserialized.cwd.disabled);
+        assert_eq!(original.cwd.symbol, deserialized.cwd.symbol);
+        assert_eq!(original.cwd.style, deserialized.cwd.style);
+        
+        assert_eq!(original.project.disabled, deserialized.project.disabled);
+        assert_eq!(original.project.symbol, deserialized.project.symbol);
+        assert_eq!(original.project.style, deserialized.project.style);
+        
+        assert_eq!(original.style.disabled, deserialized.style.disabled);
+        assert_eq!(original.style.symbol, deserialized.style.symbol);
+        assert_eq!(original.style.style, deserialized.style.style);
+        
+        assert_eq!(original.layout.elements, deserialized.layout.elements);
+    }
 }

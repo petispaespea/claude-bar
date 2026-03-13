@@ -37,6 +37,20 @@ fn main() {
         return;
     }
 
+    if cli.print_default_config {
+        let default_config = toml_config::BarConfig::default();
+        match toml::to_string_pretty(&default_config) {
+            Ok(toml_str) => {
+                println!("{}", toml_str);
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("Error serializing default config: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     let config = toml_config::load_config(None);
     let elements = config::resolve_elements(&cli, Some(&config.layout.elements));
     let icon_mode = config::resolve_icon_mode(&cli);

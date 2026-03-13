@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Element {
     Model,
     Version,
@@ -16,7 +16,7 @@ pub enum Element {
     OutputStyle,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum IconMode {
     None,
     Octicons,
@@ -76,7 +76,7 @@ pub fn build_cli() -> clap::Command {
     Cli::command()
 }
 
-fn preset_elements(name: &str) -> Option<Vec<Element>> {
+pub(crate) fn preset_elements(name: &str) -> Option<Vec<Element>> {
     Some(match name {
         "minimal" => vec![Element::Model, Element::Gauge, Element::Context],
         "compact" => vec![
@@ -91,7 +91,7 @@ fn preset_elements(name: &str) -> Option<Vec<Element>> {
     })
 }
 
-fn parse_elements(spec: &str) -> Vec<Element> {
+pub(crate) fn parse_elements(spec: &str) -> Vec<Element> {
     spec.split(',')
         .filter_map(|s| match s.trim() {
             "model" => Some(Element::Model),
@@ -176,3 +176,210 @@ ICON SETS
   none, off      No icons (text prefixes for paths)
 ");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_elements_all_element_names() {
+        let result = parse_elements("model,version,gauge,context,tokens,cache,cost,lines,duration,cwd,project,style");
+        assert_eq!(result.len(), 12);
+        assert!(result.contains(&Element::Model));
+        assert!(result.contains(&Element::Version));
+        assert!(result.contains(&Element::Gauge));
+        assert!(result.contains(&Element::Context));
+        assert!(result.contains(&Element::Tokens));
+        assert!(result.contains(&Element::Cache));
+        assert!(result.contains(&Element::Cost));
+        assert!(result.contains(&Element::Lines));
+        assert!(result.contains(&Element::Duration));
+        assert!(result.contains(&Element::Cwd));
+        assert!(result.contains(&Element::ProjectDir));
+        assert!(result.contains(&Element::OutputStyle));
+    }
+
+    #[test]
+    fn test_parse_elements_aliases() {
+        let result = parse_elements("ctx,time,project_dir,output_style");
+        assert_eq!(result.len(), 4);
+        assert!(result.contains(&Element::Context));
+        assert!(result.contains(&Element::Duration));
+        assert!(result.contains(&Element::ProjectDir));
+        assert!(result.contains(&Element::OutputStyle));
+    }
+
+    #[test]
+    fn test_parse_elements_mixed_aliases_and_names() {
+        let result = parse_elements("model,ctx,gauge,time,cwd");
+        assert_eq!(result.len(), 5);
+        assert_eq!(result[0], Element::Model);
+        assert_eq!(result[1], Element::Context);
+        assert_eq!(result[2], Element::Gauge);
+        assert_eq!(result[3], Element::Duration);
+        assert_eq!(result[4], Element::Cwd);
+    }
+
+    #[test]
+    fn test_parse_elements_unknown_names_dropped() {
+        let result = parse_elements("model,unknown1,gauge,unknown2,cost");
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], Element::Model);
+        assert_eq!(result[1], Element::Gauge);
+        assert_eq!(result[2], Element::Cost);
+    }
+
+    #[test]
+    fn test_parse_elements_empty_string() {
+        let result = parse_elements("");
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_elements_whitespace_handling() {
+        let result = parse_elements(" model , gauge , context ");
+        assert_eq!(result.len(), 3);
+        assert!(result.contains(&Element::Model));
+        assert!(result.contains(&Element::Gauge));
+        assert!(result.contains(&Element::Context));
+    }
+
+    #[test]
+    fn test_preset_elements_minimal() {
+        let result = preset_elements("minimal");
+        assert!(result.is_some());
+        let elements = result.unwrap();
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[0], Element::Model);
+        assert_eq!(elements[1], Element::Gauge);
+        assert_eq!(elements[2], Element::Context);
+    }
+
+    #[test]
+    fn test_preset_elements_compact() {
+        let result = preset_elements("compact");
+        assert!(result.is_some());
+        let elements = result.unwrap();
+        assert_eq!(elements.len(), 5);
+        assert!(elements.contains(&Element::Model));
+        assert!(elements.contains(&Element::Gauge));
+        assert!(elements.contains(&Element::Context));
+        assert!(elements.contains(&Element::Cost));
+        assert!(elements.contains(&Element::Cwd));
+    }
+
+    #[test]
+    fn test_preset_elements_default() {
+        let result = preset_elements("default");
+        assert!(result.is_some());
+        let elements = result.unwrap();
+        assert_eq!(elements.len(), 8);
+        assert!(elements.contains(&Element::Model));
+        assert!(elements.contains(&Element::Gauge));
+        assert!(elements.contains(&Element::Context));
+        assert!(elements.contains(&Element::Tokens));
+        assert!(elements.contains(&Element::Duration));
+        assert!(elements.contains(&Element::Cwd));
+        assert!(elements.contains(&Element::ProjectDir));
+        assert!(elements.contains(&Element::OutputStyle));
+    }
+
+    #[test]
+    fn test_preset_elements_full() {
+        let result = preset_elements("full");
+        assert!(result.is_some());
+        let elements = result.unwrap();
+        assert_eq!(elements.len(), 12);
+        for elem in ALL_ELEMENTS.iter() {
+            assert!(elements.contains(elem));
+        }
+    }
+
+    #[test]
+    fn test_preset_elements_unknown() {
+        let result = preset_elements("unknown_preset");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_resolve_elements_cli_precedence() {
+        let cli = Cli {
+            preset: Some("minimal".into()),
+            elements: Some("model,cost".into()),
+            list: false,
+            no_icons: false,
+            icon_set: None,
+            demo: false,
+            setup: false,
+            completions: None,
+        };
+        let result = resolve_elements(&cli);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], Element::Model);
+        assert_eq!(result[1], Element::Cost);
+    }
+
+    #[test]
+    fn test_resolve_elements_preset_precedence() {
+        let cli = Cli {
+            preset: Some("compact".into()),
+            elements: None,
+            list: false,
+            no_icons: false,
+            icon_set: None,
+            demo: false,
+            setup: false,
+            completions: None,
+        };
+        let result = resolve_elements(&cli);
+        assert_eq!(result.len(), 5);
+        assert!(result.contains(&Element::Cost));
+    }
+
+    #[test]
+    fn test_resolve_icon_mode_no_icons_flag() {
+        let cli = Cli {
+            preset: None,
+            elements: None,
+            list: false,
+            no_icons: true,
+            icon_set: None,
+            demo: false,
+            setup: false,
+            completions: None,
+        };
+        assert_eq!(resolve_icon_mode(&cli), IconMode::None);
+    }
+
+    #[test]
+    fn test_resolve_icon_mode_fontawesome() {
+        let cli = Cli {
+            preset: None,
+            elements: None,
+            list: false,
+            no_icons: false,
+            icon_set: Some("fa".into()),
+            demo: false,
+            setup: false,
+            completions: None,
+        };
+        assert_eq!(resolve_icon_mode(&cli), IconMode::FontAwesome);
+    }
+
+    #[test]
+    fn test_resolve_icon_mode_octicons_default() {
+        let cli = Cli {
+            preset: None,
+            elements: None,
+            list: false,
+            no_icons: false,
+            icon_set: None,
+            demo: false,
+            setup: false,
+            completions: None,
+        };
+        assert_eq!(resolve_icon_mode(&cli), IconMode::Octicons);
+    }
+}
+
+

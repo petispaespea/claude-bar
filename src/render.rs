@@ -18,7 +18,7 @@ const WHITE: &str = "\x1b[97m";
 const DIM: &str = "\x1b[2m";
 const RST: &str = "\x1b[0m";
 
-fn gauge(pct: f64, width: usize, color: &str) -> String {
+fn gauge_bar(pct: f64, width: usize, color: &str) -> String {
     let fill = pct / 100.0 * width as f64;
     (0..width)
         .map(|i| {
@@ -30,483 +30,156 @@ fn gauge(pct: f64, width: usize, color: &str) -> String {
 }
 
 fn pct_color(pct: f64) -> &'static str {
-    match () {
-        _ if pct >= 80.0 => RED,
-        _ if pct >= 50.0 => YELLOW,
-        _ => GREEN,
+    if pct >= 80.0 {
+        RED
+    } else if pct >= 50.0 {
+        YELLOW
+    } else {
+        GREEN
     }
 }
 
-pub trait Module {
-    #[allow(dead_code)]
-    fn element(&self) -> Element;
-    fn default_icon(&self, mode: IconMode) -> &'static str;
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String>;
-}
-
-pub struct ModelModule;
-
-impl Module for ModelModule {
-    fn element(&self) -> Element {
-        Element::Model
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
+fn icon<'a>(
+    custom: &'a str,
+    mode: IconMode,
+    none: &'static str,
+    oct: &'static str,
+    fa: &'static str,
+) -> &'a str {
+    if !custom.is_empty() && custom != oct {
+        custom
+    } else {
         match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f4be} ",
-            IconMode::FontAwesome => "\u{ee0d} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.model;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let name = input.model.as_ref()?.display_name.as_ref()?;
-        let content = format!("{i}{CYAN}{name}{RST}");
-        if cfg.style != "cyan" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
+            IconMode::None => none,
+            IconMode::Octicons => oct,
+            IconMode::FontAwesome => fa,
         }
     }
 }
 
-pub struct VersionModule;
-
-impl Module for VersionModule {
-    fn element(&self) -> Element {
-        Element::Version
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f412} ",
-            IconMode::FontAwesome => "\u{f02b} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.version;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let v = input.version.as_ref()?;
-        let content = format!("{i}{DIM}v{v}{RST}");
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
+fn styled(content: String, cfg_style: &str, default_style: &str) -> String {
+    if cfg_style != default_style {
+        apply_style(&content, cfg_style)
+    } else {
+        content
     }
 }
 
-pub struct GaugeModule;
-
-impl Module for GaugeModule {
-    fn element(&self) -> Element {
-        Element::Gauge
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f4ed} ",
-            IconMode::FontAwesome => "\u{ef0d} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.gauge;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let pct = input.context_window.as_ref()?.used_percentage?;
-        let g = gauge(pct, 10, pct_color(pct));
-        let mut out = format!("{i}{g}");
-        if input.exceeds_200k_tokens.unwrap_or(false) {
-            out.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RST}"));
-        }
-        Some(out)
-    }
+fn render_model(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.model;
+    let i = icon(&cfg.symbol, mode, "", "\u{f4be} ", "\u{ee0d} ");
+    let name = input.model.as_ref()?.display_name.as_ref()?;
+    Some(styled(format!("{i}{CYAN}{name}{RST}"), &cfg.style, "cyan"))
 }
 
-pub struct ContextModule;
-
-impl Module for ContextModule {
-    fn element(&self) -> Element {
-        Element::Context
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f463} ",
-            IconMode::FontAwesome => "\u{eeb2} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.context;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let pct = input.context_window.as_ref()?.used_percentage?;
-        Some(format!("{i}{}{pct:.0}%{RST}", pct_color(pct)))
-    }
+fn render_version(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.version;
+    let i = icon(&cfg.symbol, mode, "", "\u{f412} ", "\u{f02b} ");
+    let v = input.version.as_ref()?;
+    Some(styled(format!("{i}{DIM}v{v}{RST}"), &cfg.style, "dim"))
 }
 
-pub struct TokensModule;
-
-impl Module for TokensModule {
-    fn element(&self) -> Element {
-        Element::Tokens
+fn render_gauge(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.gauge;
+    let i = icon(&cfg.symbol, mode, "", "\u{f4ed} ", "\u{ef0d} ");
+    let pct = input.context_window.as_ref()?.used_percentage?;
+    let g = gauge_bar(pct, 10, pct_color(pct));
+    let mut out = format!("{i}{g}");
+    if input.exceeds_200k_tokens.unwrap_or(false) {
+        out.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RST}"));
     }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f4df} ",
-            IconMode::FontAwesome => "\u{f292} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.tokens;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let cw = input.context_window.as_ref()?;
-        let inp = format_tokens(cw.total_input_tokens?);
-        let out = format_tokens(cw.total_output_tokens?);
-        let content = format!("{i}{DIM}{inp}/{out}{RST}");
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+    Some(out)
 }
 
-pub struct CacheModule;
-
-impl Module for CacheModule {
-    fn element(&self) -> Element {
-        Element::Cache
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f49b} ",
-            IconMode::FontAwesome => "\u{f1c0} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.cache;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let u = input.context_window.as_ref()?.current_usage.as_ref()?;
-        let r = u.cache_read_input_tokens.unwrap_or(0);
-        let w = u.cache_creation_input_tokens.unwrap_or(0);
-        if r == 0 && w == 0 {
-            return None;
-        }
-        let content = format!("{i}{DIM}r:{} w:{}{RST}", format_tokens(r), format_tokens(w));
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+fn render_context(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.context;
+    let i = icon(&cfg.symbol, mode, "", "\u{f463} ", "\u{eeb2} ");
+    let pct = input.context_window.as_ref()?.used_percentage?;
+    Some(format!("{i}{}{pct:.0}%{RST}", pct_color(pct)))
 }
 
-pub struct CostModule;
-
-impl Module for CostModule {
-    fn element(&self) -> Element {
-        Element::Cost
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f439} ",
-            IconMode::FontAwesome => "\u{f09d} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.cost;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let c = input.cost.as_ref()?.total_cost_usd?;
-        let content = format!("{i}{DIM}${c:.2}{RST}");
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+fn render_tokens(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.tokens;
+    let i = icon(&cfg.symbol, mode, "", "\u{f4df} ", "\u{f292} ");
+    let cw = input.context_window.as_ref()?;
+    let inp = format_tokens(cw.total_input_tokens?);
+    let out = format_tokens(cw.total_output_tokens?);
+    Some(styled(format!("{i}{DIM}{inp}/{out}{RST}"), &cfg.style, "dim"))
 }
 
-pub struct LinesModule;
-
-impl Module for LinesModule {
-    fn element(&self) -> Element {
-        Element::Lines
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f4d2} ",
-            IconMode::FontAwesome => "\u{f05f} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.lines;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let cost = input.cost.as_ref()?;
-        let a = cost.total_lines_added.unwrap_or(0);
-        let d = cost.total_lines_removed.unwrap_or(0);
-        if a == 0 && d == 0 {
-            return None;
-        }
-        Some(format!("{i}{GREEN}+{a}{RST}/{RED}-{d}{RST}"))
-    }
+fn render_cache(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.cache;
+    let i = icon(&cfg.symbol, mode, "", "\u{f49b} ", "\u{f1c0} ");
+    let u = input.context_window.as_ref()?.current_usage.as_ref()?;
+    let r = u.cache_read_input_tokens.unwrap_or(0);
+    let w = u.cache_creation_input_tokens.unwrap_or(0);
+    if r == 0 && w == 0 { return None; }
+    Some(styled(
+        format!("{i}{DIM}r:{} w:{}{RST}", format_tokens(r), format_tokens(w)),
+        &cfg.style,
+        "dim",
+    ))
 }
 
-pub struct DurationModule;
-
-impl Module for DurationModule {
-    fn element(&self) -> Element {
-        Element::Duration
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "api:",
-            IconMode::Octicons => "\u{f4e3} ",
-            IconMode::FontAwesome => "\u{f254} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.duration;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let ms = input.cost.as_ref()?.total_api_duration_ms?;
-        let content = format!("{i}{DIM}{}{RST}", format_duration(ms));
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+fn render_cost(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.cost;
+    let i = icon(&cfg.symbol, mode, "", "\u{f439} ", "\u{f09d} ");
+    let c = input.cost.as_ref()?.total_cost_usd?;
+    Some(styled(format!("{i}{DIM}${c:.2}{RST}"), &cfg.style, "dim"))
 }
 
-pub struct CwdModule;
-
-impl Module for CwdModule {
-    fn element(&self) -> Element {
-        Element::Cwd
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "cwd:",
-            IconMode::Octicons => "\u{f413} ",
-            IconMode::FontAwesome => "\u{f114} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.cwd;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let p = input.cwd.as_ref()?;
-        let content = format!("{i}{DIM}{}{RST}", shorten_path(p));
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+fn render_lines(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.lines;
+    let i = icon(&cfg.symbol, mode, "", "\u{f4d2} ", "\u{f05f} ");
+    let cost = input.cost.as_ref()?;
+    let a = cost.total_lines_added.unwrap_or(0);
+    let d = cost.total_lines_removed.unwrap_or(0);
+    if a == 0 && d == 0 { return None; }
+    Some(format!("{i}{GREEN}+{a}{RST}/{RED}-{d}{RST}"))
 }
 
-pub struct ProjectDirModule;
-
-impl Module for ProjectDirModule {
-    fn element(&self) -> Element {
-        Element::ProjectDir
-    }
-
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "proj:",
-            IconMode::Octicons => "\u{f46d} ",
-            IconMode::FontAwesome => "\u{f015} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.project;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let p = input.workspace.as_ref()?.project_dir.as_ref()?;
-        let content = format!("{i}{DIM}{}{RST}", shorten_path(p));
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+fn render_duration(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.duration;
+    let i = icon(&cfg.symbol, mode, "api:", "\u{f4e3} ", "\u{f254} ");
+    let ms = input.cost.as_ref()?.total_api_duration_ms?;
+    Some(styled(format!("{i}{DIM}{}{RST}", format_duration(ms)), &cfg.style, "dim"))
 }
 
-pub struct OutputStyleModule;
+fn render_cwd(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.cwd;
+    let i = icon(&cfg.symbol, mode, "cwd:", "\u{f413} ", "\u{f114} ");
+    let p = input.cwd.as_ref()?;
+    Some(styled(format!("{i}{DIM}{}{RST}", shorten_path(p)), &cfg.style, "dim"))
+}
 
-impl Module for OutputStyleModule {
-    fn element(&self) -> Element {
-        Element::OutputStyle
-    }
+fn render_project(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.project;
+    let i = icon(&cfg.symbol, mode, "proj:", "\u{f46d} ", "\u{f015} ");
+    let p = input.workspace.as_ref()?.project_dir.as_ref()?;
+    Some(styled(format!("{i}{DIM}{}{RST}", shorten_path(p)), &cfg.style, "dim"))
+}
 
-    fn default_icon(&self, mode: IconMode) -> &'static str {
-        match mode {
-            IconMode::None => "",
-            IconMode::Octicons => "\u{f48f} ",
-            IconMode::FontAwesome => "\u{f1fc} ",
-        }
-    }
-
-    fn render(&self, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-        let cfg = &config.style;
-        if cfg.disabled {
-            return None;
-        }
-        let i = if !cfg.symbol.is_empty()
-            && cfg.symbol.as_str() != self.default_icon(IconMode::Octicons)
-        {
-            cfg.symbol.as_str()
-        } else {
-            self.default_icon(mode)
-        };
-        let name = input.output_style.as_ref()?.name.as_ref()?;
-        if name == "default" {
-            return None;
-        }
-        let content = format!("{i}{DIM}[{name}]{RST}");
-        if cfg.style != "dim" {
-            Some(apply_style(&content, &cfg.style))
-        } else {
-            Some(content)
-        }
-    }
+fn render_output_style(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let cfg = &config.style;
+    let i = icon(&cfg.symbol, mode, "", "\u{f48f} ", "\u{f1fc} ");
+    let name = input.output_style.as_ref()?.name.as_ref()?;
+    if name == "default" { return None; }
+    Some(styled(format!("{i}{DIM}[{name}]{RST}"), &cfg.style, "dim"))
 }
 
 pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-    let module: Box<dyn Module> = match elem {
-        Element::Model => Box::new(ModelModule),
-        Element::Version => Box::new(VersionModule),
-        Element::Gauge => Box::new(GaugeModule),
-        Element::Context => Box::new(ContextModule),
-        Element::Tokens => Box::new(TokensModule),
-        Element::Cache => Box::new(CacheModule),
-        Element::Cost => Box::new(CostModule),
-        Element::Lines => Box::new(LinesModule),
-        Element::Duration => Box::new(DurationModule),
-        Element::Cwd => Box::new(CwdModule),
-        Element::ProjectDir => Box::new(ProjectDirModule),
-        Element::OutputStyle => Box::new(OutputStyleModule),
-    };
-    module.render(input, mode, config)
+    match elem {
+        Element::Model => render_model(input, mode, config),
+        Element::Version => render_version(input, mode, config),
+        Element::Gauge => render_gauge(input, mode, config),
+        Element::Context => render_context(input, mode, config),
+        Element::Tokens => render_tokens(input, mode, config),
+        Element::Cache => render_cache(input, mode, config),
+        Element::Cost => render_cost(input, mode, config),
+        Element::Lines => render_lines(input, mode, config),
+        Element::Duration => render_duration(input, mode, config),
+        Element::Cwd => render_cwd(input, mode, config),
+        Element::ProjectDir => render_project(input, mode, config),
+        Element::OutputStyle => render_output_style(input, mode, config),
+    }
 }

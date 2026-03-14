@@ -38,22 +38,15 @@ fn main() {
     }
 
     if cli.print_default_config {
-        let default_config = toml_config::BarConfig::default();
-        match toml::to_string_pretty(&default_config) {
-            Ok(toml_str) => {
-                println!("{}", toml_str);
-                std::process::exit(0);
-            }
-            Err(e) => {
-                eprintln!("Error serializing default config: {}", e);
-                std::process::exit(1);
-            }
-        }
+        print!("{}", toml_config::default_config_toml());
+        return;
     }
 
     let config = toml_config::load_config(cli.config.as_ref().map(|p| p.to_str().unwrap()));
-    let elements = config::resolve_elements(&cli, Some(&config.layout.elements));
+    let toml_layout = config.as_ref().map(|c| c.layout.elements.as_slice());
+    let elements = config::resolve_elements(&cli, toml_layout);
     let icon_mode = config::resolve_icon_mode(&cli);
+    let config = config.unwrap_or_default();
 
     let input: input::Input = if cli.demo {
         input::demo()

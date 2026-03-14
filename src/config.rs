@@ -158,41 +158,60 @@ fn env(key: &str) -> Option<String> {
     std::env::var(key).ok().filter(|v| !v.is_empty())
 }
 
+fn debug(msg: &str) {
+    if std::env::var("CLAUDE_BAR_DEBUG").is_ok() {
+        eprintln!("[claude-bar] {msg}");
+    }
+}
+
 pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Element> {
     if let Some(ref spec) = cli.elements {
+        debug(&format!("elements: using --elements {spec}"));
         return parse_elements(spec);
     }
     if let Some(ref name) = cli.preset {
+        debug(&format!("elements: using --preset {name}"));
         return preset_elements(name).unwrap_or_else(|| {
             eprintln!("Unknown preset: {name}. Use --list to see available presets.");
             std::process::exit(1);
         });
     }
-    let val = env("CLAUDE_BAR").unwrap_or_else(|| "default".into());
-    if val.contains(',') {
-        return parse_elements(&val);
+    if let Some(val) = env("CLAUDE_BAR") {
+        if val.contains(',') {
+            debug(&format!("elements: using $CLAUDE_BAR={val}"));
+            return parse_elements(&val);
+        }
+        if let Some(elems) = preset_elements(&val) {
+            debug(&format!("elements: using $CLAUDE_BAR preset {val}"));
+            return elems;
+        }
     }
-    if let Some(elems) = preset_elements(&val) {
-        return elems;
-    }
-    // Use TOML layout if available and no CLI/env override
     if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
+        debug(&format!("elements: using TOML layout [{}]", layout.join(", ")));
         return parse_elements(&layout.join(","));
     }
-    ALL_ELEMENTS.to_vec()
+    debug("elements: using built-in default preset");
+    preset_elements("default").unwrap()
 }
 
 pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
     if cli.no_icons {
+        debug("icons: disabled via --no-icons");
         return IconMode::None;
     }
     let env_set = env("CLAUDE_BAR_ICON_SET");
     let set = cli.icon_set.as_deref().or(env_set.as_deref());
-    match set {
+    let mode = match set {
         Some("none" | "off") => IconMode::None,
         Some("fontawesome" | "fa") => IconMode::FontAwesome,
         _ => IconMode::Octicons,
+    };
+    if let Some(src) = set {
+        debug(&format!("icons: {src} → {mode:?}"));
+    } else {
+        debug(&format!("icons: default → {mode:?}"));
     }
+    mode
 }
 
 pub fn print_list() {

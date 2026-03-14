@@ -5,7 +5,6 @@
 /// Supports 8 colors (black, red, green, yellow, blue, magenta, cyan, white)
 /// and 4 modifiers (bold, dim, italic, underline).
 /// Unknown tokens are silently ignored. Empty string returns empty string.
-#[allow(dead_code)] // Wired in Task 10
 pub fn parse_style(style_str: &str) -> String {
     let mut result = String::new();
 
@@ -37,7 +36,6 @@ pub fn parse_style(style_str: &str) -> String {
 ///
 /// If style_str is empty, returns content unchanged (no ANSI wrapping).
 /// Otherwise, wraps content with the parsed style codes and adds reset code.
-#[allow(dead_code)] // Wired in Task 10
 pub fn apply_style(content: &str, style_str: &str) -> String {
     if style_str.is_empty() {
         content.to_string()

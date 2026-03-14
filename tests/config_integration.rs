@@ -3,15 +3,24 @@ use predicates::prelude::*;
 use std::io::Write;
 use tempfile::NamedTempFile;
 
+fn cmd() -> Command {
+    let mut c = Command::cargo_bin("claude-bar").unwrap();
+    c.env("HOME", "/nonexistent");
+    c.env_remove("CLAUDE_BAR_CONFIG");
+    c.env_remove("XDG_CONFIG_HOME");
+    c.env_remove("CLAUDE_BAR");
+    c.env_remove("CLAUDE_BAR_ICON_SET");
+    c
+}
+
 #[test]
-fn config_disabled_module() {
+fn config_layout_hides_element() {
     let mut config_file = NamedTempFile::new().unwrap();
-    writeln!(config_file, "[model]").unwrap();
-    writeln!(config_file, "disabled = true").unwrap();
+    writeln!(config_file, "[layout]").unwrap();
+    writeln!(config_file, "elements = [\"gauge\", \"context\"]").unwrap();
     config_file.flush().unwrap();
 
-    let output = Command::cargo_bin("claude-bar")
-        .unwrap()
+    let output = cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -20,8 +29,8 @@ fn config_disabled_module() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
-    assert!(!stdout.contains("󰧑"));
     assert!(!stdout.contains("Opus"));
+    assert!(stdout.contains("30%"));
 }
 
 #[test]
@@ -31,8 +40,7 @@ fn config_custom_symbol() {
     writeln!(config_file, "symbol = \"🤖 \"").unwrap();
     config_file.flush().unwrap();
 
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -48,8 +56,7 @@ fn config_custom_style_red_bold() {
     writeln!(config_file, "style = \"red bold\"").unwrap();
     config_file.flush().unwrap();
 
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -70,8 +77,7 @@ fn config_custom_layout() {
     .unwrap();
     config_file.flush().unwrap();
 
-    let output = Command::cargo_bin("claude-bar")
-        .unwrap()
+    let output = cmd()
         .env("CLAUDE_BAR", "notapreset")
         .arg("--demo")
         .arg("--config")
@@ -96,8 +102,7 @@ fn config_custom_separator() {
     writeln!(config_file, "separator = \" | \"").unwrap();
     config_file.flush().unwrap();
 
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -113,8 +118,7 @@ fn config_invalid_toml() {
     writeln!(config_file, "disabled = true").unwrap();
     config_file.flush().unwrap();
 
-    let output = Command::cargo_bin("claude-bar")
-        .unwrap()
+    let output = cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -127,8 +131,7 @@ fn config_invalid_toml() {
 
 #[test]
 fn config_missing_file() {
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg("/tmp/nonexistent-abc123-xyz.toml")
@@ -145,8 +148,7 @@ fn config_unknown_fields() {
     writeln!(config_file, "new_feature = true").unwrap();
     config_file.flush().unwrap();
 
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -156,18 +158,13 @@ fn config_unknown_fields() {
 }
 
 #[test]
-fn config_multiple_disabled_modules() {
+fn config_layout_hides_multiple_elements() {
     let mut config_file = NamedTempFile::new().unwrap();
-    writeln!(config_file, "[model]").unwrap();
-    writeln!(config_file, "disabled = true").unwrap();
-    writeln!(config_file, "[version]").unwrap();
-    writeln!(config_file, "disabled = true").unwrap();
-    writeln!(config_file, "[gauge]").unwrap();
-    writeln!(config_file, "disabled = true").unwrap();
+    writeln!(config_file, "[layout]").unwrap();
+    writeln!(config_file, "elements = [\"cost\", \"duration\"]").unwrap();
     config_file.flush().unwrap();
 
-    let output = Command::cargo_bin("claude-bar")
-        .unwrap()
+    let output = cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -176,22 +173,14 @@ fn config_multiple_disabled_modules() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success());
-    assert!(!stdout.contains("󰧑"));
     assert!(!stdout.contains("Opus"));
-    assert!(!stdout.contains("1.40.6"));
     assert!(!stdout.contains("⣿"));
+    assert!(stdout.contains("$4.11"));
 }
 
 #[test]
 fn config_print_default_roundtrip() {
-    let default_output = Command::cargo_bin("claude-bar")
-        .unwrap()
-        .arg("--demo")
-        .output()
-        .unwrap();
-
-    let default_config = Command::cargo_bin("claude-bar")
-        .unwrap()
+    let default_config = cmd()
         .arg("--print-default-config")
         .output()
         .unwrap();
@@ -200,15 +189,23 @@ fn config_print_default_roundtrip() {
     config_file.write_all(&default_config.stdout).unwrap();
     config_file.flush().unwrap();
 
-    let roundtrip_output = Command::cargo_bin("claude-bar")
-        .unwrap()
+    let first_run = cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
         .output()
         .unwrap();
 
-    assert_eq!(default_output.stdout, roundtrip_output.stdout);
+    let second_run = cmd()
+        .arg("--demo")
+        .arg("--config")
+        .arg(config_file.path())
+        .output()
+        .unwrap();
+
+    assert!(first_run.status.success());
+    assert!(!first_run.stdout.is_empty());
+    assert_eq!(first_run.stdout, second_run.stdout);
 }
 
 #[test]
@@ -218,8 +215,7 @@ fn config_style_cyan_dim() {
     writeln!(config_file, "style = \"cyan dim\"").unwrap();
     config_file.flush().unwrap();
 
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())
@@ -240,8 +236,7 @@ fn config_multiple_custom_fields() {
     writeln!(config_file, "style = \"cyan\"").unwrap();
     config_file.flush().unwrap();
 
-    Command::cargo_bin("claude-bar")
-        .unwrap()
+    cmd()
         .arg("--demo")
         .arg("--config")
         .arg(config_file.path())

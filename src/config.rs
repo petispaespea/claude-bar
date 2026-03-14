@@ -134,31 +134,33 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Element>> {
     })
 }
 
-pub(crate) fn parse_elements(spec: &str) -> Vec<Element> {
-    spec.split(',')
-        .filter_map(|s| match s.trim() {
-            "model" => Some(Element::Model),
-            "version" => Some(Element::Version),
-            "gauge" => Some(Element::Gauge),
-            "context" | "ctx" => Some(Element::Context),
-            "tokens" => Some(Element::Tokens),
-            "cache" => Some(Element::Cache),
-            "cost" => Some(Element::Cost),
-            "lines" => Some(Element::Lines),
-            "duration" | "time" => Some(Element::Duration),
-            "cwd" => Some(Element::Cwd),
-            "project" | "project_dir" => Some(Element::ProjectDir),
-            "style" | "output_style" => Some(Element::OutputStyle),
-            _ => None,
-        })
-        .collect()
+fn parse_element(s: &str) -> Option<Element> {
+    match s.trim() {
+        "model" => Some(Element::Model),
+        "version" => Some(Element::Version),
+        "gauge" => Some(Element::Gauge),
+        "context" | "ctx" => Some(Element::Context),
+        "tokens" => Some(Element::Tokens),
+        "cache" => Some(Element::Cache),
+        "cost" => Some(Element::Cost),
+        "lines" => Some(Element::Lines),
+        "duration" | "time" => Some(Element::Duration),
+        "cwd" => Some(Element::Cwd),
+        "project" | "project_dir" => Some(Element::ProjectDir),
+        "style" | "output_style" => Some(Element::OutputStyle),
+        _ => None,
+    }
 }
 
-fn env(key: &str) -> Option<String> {
+pub(crate) fn parse_elements(spec: &str) -> Vec<Element> {
+    spec.split(',').filter_map(parse_element).collect()
+}
+
+pub(crate) fn env(key: &str) -> Option<String> {
     std::env::var(key).ok().filter(|v| !v.is_empty())
 }
 
-fn debug(msg: &str) {
+pub(crate) fn debug(msg: &str) {
     if std::env::var("CLAUDE_BAR_DEBUG").is_ok() {
         eprintln!("[claude-bar] {msg}");
     }
@@ -188,7 +190,7 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Elemen
     }
     if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
         debug(&format!("elements: using TOML layout [{}]", layout.join(", ")));
-        return parse_elements(&layout.join(","));
+        return layout.iter().filter_map(|s| parse_element(s)).collect();
     }
     debug("elements: using built-in default preset");
     preset_elements("default").unwrap()

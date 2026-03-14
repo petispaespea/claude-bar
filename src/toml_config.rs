@@ -93,15 +93,7 @@ impl Default for LayoutConfig {
     }
 }
 
-fn env(key: &str) -> Option<String> {
-    std::env::var(key).ok().filter(|v| !v.is_empty())
-}
-
-fn debug(msg: &str) {
-    if std::env::var("CLAUDE_BAR_DEBUG").is_ok() {
-        eprintln!("[claude-bar] {msg}");
-    }
-}
+use crate::config::{debug, env};
 
 fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
     use std::path::PathBuf;
@@ -118,20 +110,18 @@ fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
 
     if let Some(xdg_home) = env("XDG_CONFIG_HOME") {
         let path = PathBuf::from(xdg_home).join("claude-bar.toml");
+        debug(&format!("config: trying {}", path.display()));
         if path.exists() {
-            debug(&format!("config: using {}", path.display()));
             return Some(path);
         }
-        debug(&format!("config: tried {} (not found)", path.display()));
     }
 
     if let Ok(home) = std::env::var("HOME") {
         let path = PathBuf::from(home).join(".config/claude-bar.toml");
+        debug(&format!("config: trying {}", path.display()));
         if path.exists() {
-            debug(&format!("config: using {}", path.display()));
             return Some(path);
         }
-        debug(&format!("config: tried {} (not found)", path.display()));
     }
 
     debug("config: no config file found, using defaults");

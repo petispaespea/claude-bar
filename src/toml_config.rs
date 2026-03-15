@@ -77,7 +77,7 @@ pub struct StatsConfig {
 
 impl Default for StatsConfig {
     fn default() -> Self {
-        Self { enabled: false }
+        Self { enabled: true }
     }
 }
 

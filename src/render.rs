@@ -1,10 +1,11 @@
 use crate::config::{
-    Element, IconMode, Icons, ALERT_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS,
-    DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS,
-    VERSION_ICONS,
+    Element, IconMode, Icons, ALERT_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
+    COST_VS_AVG_ICONS, CWD_ICONS, DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS,
+    SESSION_CT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS,
 };
 use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::input::Input;
+use crate::stats::TodayStats;
 use crate::style::{apply_style, parse_style};
 use crate::toml_config::BarConfig;
 
@@ -146,6 +147,14 @@ fn render_element(
     Some(format!("{i}{ansi}{v}{RST}"))
 }
 
+fn styled_or_raw(content: String, style: &str) -> String {
+    if style.is_empty() {
+        content
+    } else {
+        apply_style(&content, style)
+    }
+}
+
 fn render_model(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
     let name = input.model.as_ref()?.display_name.as_ref()?;
     render_element(&config.model.symbol, &config.model.style, mode,
@@ -179,11 +188,7 @@ fn render_context(input: &Input, mode: IconMode, config: &BarConfig) -> Option<S
         out.push_str(&format!("{color}{pct:.0}%{RST}"));
     }
 
-    if !cfg.style.is_empty() {
-        Some(apply_style(&out, &cfg.style))
-    } else {
-        Some(out)
-    }
+    Some(styled_or_raw(out, &cfg.style))
 }
 
 fn render_tokens(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
@@ -195,9 +200,7 @@ fn render_tokens(input: &Input, mode: IconMode, config: &BarConfig) -> Option<St
 }
 
 fn render_cache(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-    let u = input.context_window.as_ref()?.current_usage.as_ref()?;
-    let r = u.cache_read_input_tokens.unwrap_or(0);
-    let w = u.cache_creation_input_tokens.unwrap_or(0);
+    let (r, w) = input.cache_tokens()?;
     if r == 0 && w == 0 { return None; }
     render_element(&config.cache.symbol, &config.cache.style, mode,
         &CACHE_ICONS,
@@ -254,7 +257,7 @@ fn severity_style(severity: &str) -> (&'static str, &'static str) {
     }
 }
 
-fn render_alert(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
     let mut badges = Vec::new();
 
     for rule in &config.alerts {
@@ -265,6 +268,13 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig) -> Option<Str
                     input.context_window.as_ref()
                         .and_then(|cw| cw.used_percentage)
                         .is_some_and(|pct| pct >= threshold)
+                } else {
+                    false
+                }
+            }
+            "cost_high" => {
+                if let Some(stats) = today_stats {
+                    stats.daily_budget_pct.is_some_and(|pct| pct >= 100.0)
                 } else {
                     false
                 }
@@ -286,7 +296,89 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig) -> Option<Str
     }
 }
 
-pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+fn render_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let stats = today_stats.as_ref()?;
+    render_element(&config.daily_cost.symbol, &config.daily_cost.style, mode,
+        &COST_ICONS, Some(format!("${:.2}/day", stats.daily_cost)))
+}
+
+fn render_burn_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let rate = today_stats.as_ref()?.burn_rate?;
+    render_element(&config.burn_rate.symbol, &config.burn_rate.style, mode,
+        &DURATION_ICONS, Some(format!("${rate:.2}/hr")))
+}
+
+fn render_spend_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let rate = today_stats.as_ref()?.spend_rate?;
+    render_element(&config.spend_rate.symbol, &config.spend_rate.style, mode,
+        &DURATION_ICONS, Some(format!("${rate:.2}/hr")))
+}
+
+fn render_session_count(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let count = today_stats.as_ref()?.session_count;
+    render_element(&config.session_count.symbol, &config.session_count.style, mode,
+        &SESSION_CT_ICONS, Some(format!("#{count} today")))
+}
+
+fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let stats = today_stats.as_ref()?;
+    let pct = stats.daily_budget_pct?;
+    let cfg = &config.daily_budget;
+    let limit = cfg.limit;
+    let cost = stats.daily_cost;
+
+    let i = icon(&cfg.symbol, mode, &COST_ICONS);
+    let color = pct_color(pct);
+    let bar_style = parse_bar_style(&cfg.bar_style);
+
+    let mut out = String::from(i);
+    out.push_str(&format!("{color}${cost:.0}/${limit:.0}{RST}"));
+
+    if cfg.show_bar {
+        out.push(' ');
+        out.push_str(&render_bar(pct.min(100.0), bar_style, cfg.width, color));
+    }
+    if cfg.show_pct {
+        out.push(' ');
+        out.push_str(&format!("{color}{pct:.0}%{RST}"));
+    }
+
+    Some(styled_or_raw(out, &cfg.style))
+}
+
+fn render_tok_per_dollar(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let tpd = today_stats.as_ref()?.tok_per_dollar?;
+    let formatted = crate::format::format_tokens(tpd as u64);
+    render_element(&config.tok_per_dollar.symbol, &config.tok_per_dollar.style, mode,
+        &TOKENS_ICONS, Some(format!("{formatted}/$")))
+}
+
+fn render_cache_hit_rate(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let (r, w) = input.cache_tokens()?;
+    let total = r + w;
+    if total == 0 { return None; }
+    let pct = r as f64 / total as f64 * 100.0;
+    render_element(&config.cache_hit_rate.symbol, &config.cache_hit_rate.style, mode,
+        &CACHE_ICONS, Some(format!("{pct:.0}%")))
+}
+
+fn render_cost_vs_avg(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let ratio = today_stats.as_ref()?.cost_vs_avg?;
+    render_element(&config.cost_vs_avg.symbol, &config.cost_vs_avg.style, mode,
+        &COST_VS_AVG_ICONS, Some(format!("{ratio:.1}× avg")))
+}
+
+fn render_ctx_trend(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let delta = today_stats.as_ref()?.ctx_trend?;
+    let arrow = if delta > 2.0 { "▲" } else if delta < -2.0 { "▼" } else { "▸" };
+    let color = if delta > 2.0 { RED } else if delta < -2.0 { GREEN } else { DIM };
+    let cfg = &config.ctx_trend;
+    let i = icon(&cfg.symbol, mode, &CONTEXT_ICONS);
+    let content = format!("{i}{color}{arrow} {delta:+.0}%{RST}");
+    Some(styled_or_raw(content, &cfg.style))
+}
+
+pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
     match elem {
         Element::Model => render_model(input, mode, config),
         Element::Version => render_version(input, mode, config),
@@ -299,6 +391,15 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig) 
         Element::Cwd => render_cwd(input, mode, config),
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),
-        Element::Alert => render_alert(input, mode, config),
+        Element::Alert => render_alert(input, mode, config, today_stats),
+        Element::DailyCost => render_daily_cost(input, mode, config, today_stats),
+        Element::BurnRate => render_burn_rate(input, mode, config, today_stats),
+        Element::SpendRate => render_spend_rate(input, mode, config, today_stats),
+        Element::SessionCount => render_session_count(input, mode, config, today_stats),
+        Element::DailyBudget => render_daily_budget(input, mode, config, today_stats),
+        Element::TokPerDollar => render_tok_per_dollar(input, mode, config, today_stats),
+        Element::CacheHitRate => render_cache_hit_rate(input, mode, config),
+        Element::CostVsAvg => render_cost_vs_avg(input, mode, config, today_stats),
+        Element::CtxTrend => render_ctx_trend(input, mode, config, today_stats),
     }
 }

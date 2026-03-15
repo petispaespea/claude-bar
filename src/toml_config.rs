@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::{
-    debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS, DURATION_ICONS,
-    LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS,
+    debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, COST_VS_AVG_ICONS, CWD_ICONS,
+    DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, SESSION_CT_ICONS, STYLE_ICONS,
+    TOKENS_ICONS, VERSION_ICONS,
 };
 
 macro_rules! module_config {
@@ -35,6 +36,14 @@ module_config!(DurationConfig,    DURATION_ICONS,  "dim");
 module_config!(CwdConfig,         CWD_ICONS,      "dim");
 module_config!(ProjectDirConfig,  PROJECT_ICONS,   "dim");
 module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
+module_config!(DailyCostConfig,   COST_ICONS,       "");
+module_config!(BurnRateConfig,    DURATION_ICONS,   "dim");
+module_config!(SpendRateConfig,   DURATION_ICONS,   "dim");
+module_config!(SessionCountConfig, SESSION_CT_ICONS, "dim");
+module_config!(TokPerDollarConfig, TOKENS_ICONS,     "dim");
+module_config!(CacheHitRateConfig, CACHE_ICONS,      "dim");
+module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim");
+module_config!(CtxTrendConfig,     CONTEXT_ICONS,    "");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -61,6 +70,44 @@ impl Default for ContextConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct StatsConfig {
+    pub enabled: bool,
+}
+
+impl Default for StatsConfig {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct DailyBudgetConfig {
+    pub symbol: String,
+    pub style: String,
+    pub bar_style: String,
+    pub width: usize,
+    pub show_bar: bool,
+    pub show_pct: bool,
+    pub limit: f64,
+}
+
+impl Default for DailyBudgetConfig {
+    fn default() -> Self {
+        Self {
+            symbol: COST_ICONS.oct.to_string(),
+            style: String::new(),
+            bar_style: "block".to_string(),
+            width: 8,
+            show_bar: true,
+            show_pct: true,
+            limit: 100.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AlertRule {
     pub trigger: String,
     #[serde(default = "AlertRule::default_label")]
@@ -81,6 +128,7 @@ impl AlertRule {
 pub struct BarConfig {
     pub separator: String,
     pub layout: LayoutConfig,
+    pub stats: StatsConfig,
     pub model: ModelConfig,
     pub version: VersionConfig,
     pub context: ContextConfig,
@@ -92,6 +140,15 @@ pub struct BarConfig {
     pub cwd: CwdConfig,
     pub project: ProjectDirConfig,
     pub style: OutputStyleConfig,
+    pub daily_cost: DailyCostConfig,
+    pub burn_rate: BurnRateConfig,
+    pub spend_rate: SpendRateConfig,
+    pub session_count: SessionCountConfig,
+    pub daily_budget: DailyBudgetConfig,
+    pub tok_per_dollar: TokPerDollarConfig,
+    pub cache_hit_rate: CacheHitRateConfig,
+    pub cost_vs_avg: CostVsAvgConfig,
+    pub ctx_trend: CtxTrendConfig,
     #[serde(rename = "alert")]
     pub alerts: Vec<AlertRule>,
 }
@@ -101,6 +158,7 @@ impl Default for BarConfig {
         Self {
             separator: " | ".into(),
             layout: Default::default(),
+            stats: Default::default(),
             model: Default::default(),
             version: Default::default(),
             context: Default::default(),
@@ -112,12 +170,29 @@ impl Default for BarConfig {
             cwd: Default::default(),
             project: Default::default(),
             style: Default::default(),
-            alerts: vec![AlertRule {
-                trigger: "ctx_exceeded".into(),
-                label: "CTX EXCEEDED".into(),
-                severity: "error".into(),
-                threshold: None,
-            }],
+            daily_cost: Default::default(),
+            burn_rate: Default::default(),
+            spend_rate: Default::default(),
+            session_count: Default::default(),
+            daily_budget: Default::default(),
+            tok_per_dollar: Default::default(),
+            cache_hit_rate: Default::default(),
+            cost_vs_avg: Default::default(),
+            ctx_trend: Default::default(),
+            alerts: vec![
+                AlertRule {
+                    trigger: "ctx_exceeded".into(),
+                    label: "CTX EXCEEDED".into(),
+                    severity: "error".into(),
+                    threshold: None,
+                },
+                AlertRule {
+                    trigger: "cost_high".into(),
+                    label: "BUDGET EXCEEDED".into(),
+                    severity: "error".into(),
+                    threshold: None,
+                },
+            ],
         }
     }
 }
@@ -205,7 +280,9 @@ pub fn default_config_toml() -> String {
 # Styles: black red green yellow blue magenta cyan white bold dim italic underline
 # Empty style \"\" means the element controls its own color dynamically.
 ";
-    let body = toml::to_string_pretty(&BarConfig::default()).unwrap();
+    let mut config = BarConfig::default();
+    config.layout.elements = crate::config::ALL_ELEMENT_NAMES.iter().map(|s| s.to_string()).collect();
+    let body = toml::to_string_pretty(&config).unwrap();
     format!("{header}\n{body}")
 }
 
@@ -439,10 +516,12 @@ show_pct = false
     #[test]
     fn test_default_alert_rules() {
         let config = BarConfig::default();
-        assert_eq!(config.alerts.len(), 1);
+        assert_eq!(config.alerts.len(), 2);
         assert_eq!(config.alerts[0].trigger, "ctx_exceeded");
         assert_eq!(config.alerts[0].severity, "error");
         assert!(config.alerts[0].threshold.is_none());
+        assert_eq!(config.alerts[1].trigger, "cost_high");
+        assert_eq!(config.alerts[1].label, "BUDGET EXCEEDED");
     }
 
     #[test]

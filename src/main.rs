@@ -3,6 +3,7 @@ mod format;
 mod input;
 mod render;
 mod setup;
+mod stats;
 mod style;
 mod toml_config;
 
@@ -42,6 +43,17 @@ fn main() {
         return;
     }
 
+    if cli.stats_clear {
+        stats::clear_stats(cli.yes);
+        return;
+    }
+
+    if cli.stats {
+        let records = stats::load_records(cli.stats_days, cli.stats_project.as_deref());
+        stats::print_summary(&records, cli.stats_days);
+        return;
+    }
+
     let config = toml_config::load_config(cli.config.as_ref().map(|p| p.to_str().unwrap()));
     let toml_layout = config.as_ref().map(|c| c.layout.elements.as_slice());
     let elements = config::resolve_elements(&cli, toml_layout);
@@ -61,9 +73,34 @@ fn main() {
         }
     };
 
+    if config.stats.enabled && !cli.demo {
+        stats::append_record(&input);
+    }
+
+    let today_stats = if config.stats.enabled {
+        let today = stats::load_today_records();
+        let current_cost = input.cost.as_ref().and_then(|c| c.total_cost_usd);
+        let current_api_ms = input.cost.as_ref().and_then(|c| c.total_api_duration_ms);
+        let current_out_tok = input.context_window.as_ref().and_then(|c| c.total_output_tokens);
+        let budget_limit = if config.daily_budget.limit > 0.0 {
+            Some(config.daily_budget.limit)
+        } else {
+            None
+        };
+        Some(stats::compute_today_stats(
+            &today,
+            current_cost,
+            current_api_ms,
+            current_out_tok,
+            budget_limit,
+        ))
+    } else {
+        None
+    };
+
     let out: String = elements
         .iter()
-        .filter_map(|e| render::render(*e, &input, icon_mode, &config))
+        .filter_map(|e| render::render(*e, &input, icon_mode, &config, &today_stats))
         .collect::<Vec<_>>()
         .join(&config.separator);
 

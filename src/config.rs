@@ -14,6 +14,15 @@ pub enum Element {
     ProjectDir,
     OutputStyle,
     Alert,
+    DailyCost,
+    BurnRate,
+    SpendRate,
+    SessionCount,
+    DailyBudget,
+    TokPerDollar,
+    CacheHitRate,
+    CostVsAvg,
+    CtxTrend,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -41,6 +50,8 @@ pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa:
 pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
 pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
 pub const ALERT_ICONS: Icons       = Icons { none: "",     oct: "\u{f421} ", fa: "\u{f071} " };
+pub const SESSION_CT_ICONS: Icons  = Icons { none: "#",    oct: "\u{f4a5} ", fa: "\u{f0c5} " };
+pub const COST_VS_AVG_ICONS: Icons = Icons { none: "",     oct: "\u{f4a8} ", fa: "\u{f080} " };
 
 const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
@@ -55,7 +66,25 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::ProjectDir,
     Element::OutputStyle,
     Element::Alert,
+    Element::DailyCost,
+    Element::BurnRate,
+    Element::SpendRate,
+    Element::SessionCount,
+    Element::DailyBudget,
+    Element::TokPerDollar,
+    Element::CacheHitRate,
+    Element::CostVsAvg,
+    Element::CtxTrend,
 ];
+
+pub const ALL_ELEMENT_NAMES: &[&str] = &[
+    "model", "version", "context", "tokens", "cache",
+    "cost", "lines", "duration", "cwd", "project", "style", "alert",
+    "daily_cost", "burn_rate", "spend_rate", "session_count",
+    "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
+];
+
+const _: () = assert!(ALL_ELEMENTS.len() == ALL_ELEMENT_NAMES.len());
 
 #[derive(Parser)]
 #[command(
@@ -87,7 +116,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements (model, version, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert)"
+        help = "Comma-separated elements (model, version, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
     )]
     pub elements: Option<String>,
 
@@ -122,6 +151,21 @@ pub struct Cli {
 
     #[arg(long, help = "Print default TOML config to stdout")]
     pub print_default_config: bool,
+
+    #[arg(long, help = "Show usage statistics")]
+    pub stats: bool,
+
+    #[arg(long, value_name = "N", default_value = "7", help = "Stats lookback in days")]
+    pub stats_days: u64,
+
+    #[arg(long, value_name = "PATH", help = "Filter stats to a specific project")]
+    pub stats_project: Option<String>,
+
+    #[arg(long, help = "Delete the stats log file")]
+    pub stats_clear: bool,
+
+    #[arg(long, help = "Confirm destructive operations (required for --stats-clear)")]
+    pub yes: bool,
 }
 
 pub fn build_cli() -> clap::Command {
@@ -167,6 +211,15 @@ fn parse_element(s: &str) -> Option<Element> {
         "project" | "project_dir" => Some(Element::ProjectDir),
         "style" | "output_style" => Some(Element::OutputStyle),
         "alert" => Some(Element::Alert),
+        "daily_cost" => Some(Element::DailyCost),
+        "burn_rate" => Some(Element::BurnRate),
+        "spend_rate" => Some(Element::SpendRate),
+        "session_count" => Some(Element::SessionCount),
+        "daily_budget" => Some(Element::DailyBudget),
+        "tok_per_dollar" => Some(Element::TokPerDollar),
+        "cache_hit_rate" | "cache_hit" => Some(Element::CacheHitRate),
+        "cost_vs_avg" => Some(Element::CostVsAvg),
+        "ctx_trend" => Some(Element::CtxTrend),
         _ => None,
     }
 }
@@ -258,7 +311,21 @@ ELEMENTS
     project_dir
   style,         Output style (hidden when \"default\")
     output_style
-  alert          Conditional badges (ctx exceeded, ctx high)
+  alert          Conditional badges (ctx exceeded, ctx high, budget)
+
+STATS ELEMENTS (require [stats] enabled = true)
+  daily_cost     Sum of session costs today
+  burn_rate      Cost per hour (API duration)
+  spend_rate     Cost per hour (wall clock)
+  session_count  Number of sessions today
+  daily_budget   Daily spend limit with progress bar
+  tok_per_dollar Output tokens per dollar
+  cost_vs_avg    Current session cost vs historical average
+  ctx_trend      Context usage direction over last 10 renders
+
+INPUT-ONLY ELEMENTS
+  cache_hit_rate Cache hit percentage (no stats required)
+    cache_hit
 
 BAR STYLES (for context element)
   braille        Sub-cell braille dots (default, highest resolution)
@@ -277,6 +344,26 @@ ICON SETS
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_cli() -> Cli {
+        Cli {
+            preset: None,
+            elements: None,
+            info: false,
+            no_icons: false,
+            icon_set: None,
+            demo: false,
+            setup: false,
+            completions: None,
+            print_default_config: false,
+            config: None,
+            stats: false,
+            stats_days: 7,
+            stats_project: None,
+            stats_clear: false,
+            yes: false,
+        }
+    }
 
     #[test]
     fn test_parse_elements_all_element_names() {
@@ -388,7 +475,7 @@ mod tests {
         let result = preset_elements("full");
         assert!(result.is_some());
         let elements = result.unwrap();
-        assert_eq!(elements.len(), 12);
+        assert_eq!(elements.len(), 21);
         for elem in ALL_ELEMENTS.iter() {
             assert!(elements.contains(elem));
         }
@@ -401,19 +488,38 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_elements_new_stats_elements() {
+        let result = parse_elements(
+            "daily_cost,burn_rate,spend_rate,session_count,daily_budget,tok_per_dollar,cache_hit_rate,cost_vs_avg,ctx_trend",
+        );
+        assert_eq!(result.len(), 9);
+        assert!(result.contains(&Element::DailyCost));
+        assert!(result.contains(&Element::SpendRate));
+        assert!(result.contains(&Element::CacheHitRate));
+    }
+
+    #[test]
+    fn test_parse_elements_cache_hit_alias() {
+        let result = parse_elements("cache_hit");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], Element::CacheHitRate);
+    }
+
+    #[test]
+    fn test_preset_elements_full_includes_stats() {
+        let result = preset_elements("full").unwrap();
+        assert!(result.contains(&Element::DailyCost));
+        assert!(result.contains(&Element::BurnRate));
+        assert!(result.contains(&Element::SpendRate));
+        assert!(result.contains(&Element::CacheHitRate));
+        assert!(result.contains(&Element::CtxTrend));
+    }
+
+    #[test]
     fn test_resolve_elements_cli_precedence() {
-        let cli = Cli {
-            preset: Some("minimal".into()),
-            elements: Some("model,cost".into()),
-            info: false,
-            no_icons: false,
-            icon_set: None,
-            demo: false,
-            setup: false,
-            completions: None,
-            print_default_config: false,
-            config: None,
-        };
+        let mut cli = test_cli();
+        cli.preset = Some("minimal".into());
+        cli.elements = Some("model,cost".into());
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], Element::Model);
@@ -422,18 +528,8 @@ mod tests {
 
     #[test]
     fn test_resolve_elements_preset_precedence() {
-        let cli = Cli {
-            preset: Some("compact".into()),
-            elements: None,
-            info: false,
-            no_icons: false,
-            icon_set: None,
-            demo: false,
-            setup: false,
-            completions: None,
-            print_default_config: false,
-            config: None,
-        };
+        let mut cli = test_cli();
+        cli.preset = Some("compact".into());
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 5);
         assert!(result.contains(&Element::Cost));
@@ -442,52 +538,32 @@ mod tests {
 
     #[test]
     fn test_resolve_icon_mode_no_icons_flag() {
-        let cli = Cli {
-            preset: None,
-            elements: None,
-            info: false,
-            no_icons: true,
-            icon_set: None,
-            demo: false,
-            setup: false,
-            completions: None,
-            print_default_config: false,
-            config: None,
-        };
+        let mut cli = test_cli();
+        cli.no_icons = true;
         assert_eq!(resolve_icon_mode(&cli), IconMode::None);
     }
 
     #[test]
     fn test_resolve_icon_mode_fontawesome() {
-        let cli = Cli {
-            preset: None,
-            elements: None,
-            info: false,
-            no_icons: false,
-            icon_set: Some("fa".into()),
-            demo: false,
-            setup: false,
-            completions: None,
-            print_default_config: false,
-            config: None,
-        };
+        let mut cli = test_cli();
+        cli.icon_set = Some("fa".into());
         assert_eq!(resolve_icon_mode(&cli), IconMode::FontAwesome);
     }
 
     #[test]
     fn test_resolve_icon_mode_octicons_default() {
-        let cli = Cli {
-            preset: None,
-            elements: None,
-            info: false,
-            no_icons: false,
-            icon_set: None,
-            demo: false,
-            setup: false,
-            completions: None,
-            print_default_config: false,
-            config: None,
-        };
+        let cli = test_cli();
         assert_eq!(resolve_icon_mode(&cli), IconMode::Octicons);
+    }
+
+    #[test]
+    fn test_all_element_names_parse_to_matching_elements() {
+        for (elem, name) in ALL_ELEMENTS.iter().zip(ALL_ELEMENT_NAMES.iter()) {
+            assert_eq!(
+                parse_element(name),
+                Some(*elem),
+                "ALL_ELEMENT_NAMES entry '{name}' does not parse to matching ALL_ELEMENTS entry"
+            );
+        }
     }
 }

@@ -12,6 +12,16 @@ pub struct Input {
     pub workspace: Option<Workspace>,
 }
 
+impl Input {
+    pub fn cache_tokens(&self) -> Option<(u64, u64)> {
+        let u = self.context_window.as_ref()?.current_usage.as_ref()?;
+        Some((
+            u.cache_read_input_tokens.unwrap_or(0),
+            u.cache_creation_input_tokens.unwrap_or(0),
+        ))
+    }
+}
+
 #[derive(Deserialize)]
 pub struct Model {
     pub display_name: Option<String>,

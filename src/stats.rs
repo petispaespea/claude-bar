@@ -18,9 +18,14 @@ fn now_secs() -> u64 {
 
 const SESSION_GAP_SECS: u64 = 7200;
 const MS_PER_HOUR: f64 = 3_600_000.0;
+const SECS_PER_DAY: u64 = 86_400;
+
+const STATS_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsRecord {
+    #[serde(default)]
+    pub v: u8,
     pub ts: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
@@ -51,8 +56,8 @@ pub struct StatsRecord {
 }
 
 #[derive(Debug)]
-pub struct Session {
-    pub records: Vec<StatsRecord>,
+pub struct Session<'a> {
+    pub records: Vec<&'a StatsRecord>,
 }
 
 macro_rules! session_final {
@@ -63,7 +68,7 @@ macro_rules! session_final {
     };
 }
 
-impl Session {
+impl Session<'_> {
     session_final!(final_cost, cost, f64, 0.0);
     session_final!(final_api_ms, api_ms, u64, 0);
     session_final!(final_in_tok, in_tok, u64, 0);
@@ -84,13 +89,18 @@ impl Session {
     }
 }
 
-pub fn log_path() -> PathBuf {
+pub fn stats_dir() -> PathBuf {
     let base = if let Some(xdg) = env("XDG_DATA_HOME") {
         PathBuf::from(xdg)
     } else {
         default_data_dir()
     };
-    base.join("claude-bar").join("stats.jsonl")
+    base.join("claude-bar").join("stats")
+}
+
+fn stats_file_for_day(ts: u64) -> PathBuf {
+    let d = day_string(ts);
+    stats_dir().join(format!("{d}.jsonl"))
 }
 
 fn default_data_dir() -> PathBuf {
@@ -99,11 +109,11 @@ fn default_data_dir() -> PathBuf {
 }
 
 pub fn append_record(input: &Input) {
-    let path = log_path();
-
     let now = now_secs();
+    let path = stats_file_for_day(now);
 
     let record = StatsRecord {
+        v: STATS_VERSION,
         ts: now,
         session_id: input.session_id.clone(),
         model: input.model.as_ref().and_then(|m| m.display_name.clone()),
@@ -147,25 +157,54 @@ pub fn append_record(input: &Input) {
 }
 
 pub fn load_records(days: u64, project: Option<&str>) -> Vec<StatsRecord> {
-    let path = log_path();
-    let file = match fs::File::open(&path) {
-        Ok(f) => f,
-        Err(_) => return Vec::new(),
-    };
-
     let now = now_secs();
-    let cutoff = now.saturating_sub(days * 86400);
+    let cutoff = now.saturating_sub(days * SECS_PER_DAY);
+    let dir = stats_dir();
 
-    let reader = BufReader::new(file);
     let mut records = Vec::new();
 
+    if let Ok(entries) = fs::read_dir(&dir) {
+        let cutoff_day = day_string(cutoff);
+        let mut paths: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| {
+                p.extension().and_then(|e| e.to_str()) == Some("jsonl")
+                    && p.file_stem()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|s| s >= cutoff_day.as_str())
+            })
+            .collect();
+        paths.sort();
+        for path in &paths {
+            load_from_file(path, cutoff, project, &mut records);
+        }
+    }
+
+    records
+}
+
+fn load_from_file(
+    path: &std::path::Path,
+    cutoff: u64,
+    project: Option<&str>,
+    records: &mut Vec<StatsRecord>,
+) {
+    let file = match fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return,
+    };
+    let reader = BufReader::new(file);
     for line in reader.lines() {
         let Ok(line) = line else { continue };
         if line.is_empty() {
             continue;
         }
         let Ok(record): Result<StatsRecord, _> = serde_json::from_str(&line) else {
-            debug(&format!("stats: skipping malformed line: {}", &line[..line.len().min(80)]));
+            debug(&format!(
+                "stats: skipping malformed line: {}",
+                &line[..line.len().min(80)]
+            ));
             continue;
         };
         if record.ts < cutoff {
@@ -178,25 +217,23 @@ pub fn load_records(days: u64, project: Option<&str>) -> Vec<StatsRecord> {
         }
         records.push(record);
     }
-
-    records
 }
 
 pub fn load_today_records() -> Vec<StatsRecord> {
     load_records(1, None)
 }
 
-pub fn detect_sessions(records: &[StatsRecord]) -> Vec<Session> {
-    let mut by_project: HashMap<String, Vec<&StatsRecord>> = HashMap::new();
+pub fn detect_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
+    let mut by_project: HashMap<&str, Vec<&'a StatsRecord>> = HashMap::new();
     for r in records {
-        let key = r.project.clone().unwrap_or_default();
+        let key = r.project.as_deref().unwrap_or("");
         by_project.entry(key).or_default().push(r);
     }
 
     let mut sessions = Vec::new();
 
     for (_proj, recs) in by_project {
-        let mut current: Vec<StatsRecord> = Vec::new();
+        let mut current: Vec<&'a StatsRecord> = Vec::new();
 
         for r in recs {
             let is_boundary = if let Some(prev) = current.last() {
@@ -217,7 +254,7 @@ pub fn detect_sessions(records: &[StatsRecord]) -> Vec<Session> {
                     records: std::mem::take(&mut current),
                 });
             }
-            current.push(r.clone());
+            current.push(r);
         }
 
         if !current.is_empty() {
@@ -373,7 +410,7 @@ pub fn print_summary(records: &[StatsRecord], days: u64) {
     }
 
     fn ranked_summary(
-        sessions: &[Session],
+        sessions: &[Session<'_>],
         key_fn: fn(&Session) -> String,
     ) -> Vec<(String, usize, f64)> {
         let mut map: HashMap<String, (usize, f64)> = HashMap::new();
@@ -386,7 +423,7 @@ pub fn print_summary(records: &[StatsRecord], days: u64) {
             .into_iter()
             .map(|(k, (c, cost))| (k, c, cost))
             .collect();
-        ranked.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+        ranked.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
         ranked
     }
 
@@ -435,7 +472,7 @@ fn day_string(ts: u64) -> String {
 }
 
 fn time_from_epoch(secs: u64) -> (u64, u64, u64) {
-    let days = secs / 86400;
+    let days = secs / SECS_PER_DAY;
     let mut y = 1970u64;
     let mut remaining = days;
 
@@ -480,21 +517,21 @@ fn is_leap(y: u64) -> bool {
 }
 
 pub fn clear_stats(yes: bool) {
-    let path = log_path();
+    let dir = stats_dir();
     if !yes {
         eprintln!(
             "This will delete {}. Pass --yes to confirm.",
-            path.display()
+            dir.display()
         );
         std::process::exit(1);
     }
-    match fs::remove_file(&path) {
-        Ok(()) => eprintln!("Deleted {}", path.display()),
+    match fs::remove_dir_all(&dir) {
+        Ok(()) => eprintln!("Deleted {}", dir.display()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            eprintln!("No stats file found at {}", path.display());
+            eprintln!("No stats found at {}", dir.display());
         }
         Err(e) => {
-            eprintln!("Could not delete {}: {e}", path.display());
+            eprintln!("Could not delete {}: {e}", dir.display());
             std::process::exit(1);
         }
     }
@@ -506,6 +543,7 @@ mod tests {
 
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
         StatsRecord {
+            v: STATS_VERSION,
             ts,
             session_id: None,
             model: Some("Opus 4.6".into()),
@@ -534,11 +572,9 @@ mod tests {
     }
 
     #[test]
-    fn log_path_respects_xdg() {
-        // Just verify the function doesn't panic; actual XDG behavior
-        // depends on the environment and is integration-tested.
-        let path = log_path();
-        assert!(path.ends_with("claude-bar/stats.jsonl"));
+    fn stats_dir_respects_xdg() {
+        let dir = stats_dir();
+        assert!(dir.ends_with("claude-bar/stats"));
     }
 
     #[test]
@@ -604,7 +640,8 @@ mod tests {
         r2.session_id = Some("aaa".into());
         let mut r3 = record(1200, 3.0, "/proj");
         r3.session_id = Some("bbb".into());
-        let sessions = detect_sessions(&[r1, r2, r3]);
+        let records = [r1, r2, r3];
+        let sessions = detect_sessions(&records);
         assert_eq!(sessions.len(), 2);
         assert_eq!(sessions[0].records.len(), 2);
         assert_eq!(sessions[1].records.len(), 1);
@@ -618,7 +655,8 @@ mod tests {
         r2.session_id = None;
         let mut r3 = record(1200, 3.0, "/proj");
         r3.session_id = Some("aaa".into());
-        let sessions = detect_sessions(&[r1, r2, r3]);
+        let records = [r1, r2, r3];
+        let sessions = detect_sessions(&records);
         assert_eq!(sessions.len(), 3);
     }
 
@@ -726,6 +764,7 @@ mod tests {
             .unwrap()
             .as_secs();
         let r = StatsRecord {
+            v: STATS_VERSION,
             ts: now,
             session_id: Some("test-session".into()),
             model: Some("Opus 4.6".into()),
@@ -786,11 +825,10 @@ mod tests {
 
     #[test]
     fn session_accessors() {
+        let r1 = record(1000, 1.0, "/proj");
+        let r2 = record(1100, 2.0, "/proj");
         let s = Session {
-            records: vec![
-                record(1000, 1.0, "/proj"),
-                record(1100, 2.0, "/proj"),
-            ],
+            records: vec![&r1, &r2],
         };
         assert_eq!(s.final_cost(), 2.0);
         assert_eq!(s.start_ts(), 1000);

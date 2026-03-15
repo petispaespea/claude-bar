@@ -99,7 +99,7 @@ pub struct BarConfig {
 impl Default for BarConfig {
     fn default() -> Self {
         Self {
-            separator: "  ".into(),
+            separator: " | ".into(),
             layout: Default::default(),
             model: Default::default(),
             version: Default::default(),
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn test_deserialize_empty_string_uses_all_defaults() {
         let config: BarConfig = toml::from_str("").expect("Should deserialize");
-        assert_eq!(config.separator, "  ");
+        assert_eq!(config.separator, " | ");
         assert_eq!(config.model.symbol, "\u{f4be} ");
         assert_eq!(config.model.style, "cyan");
     }
@@ -274,7 +274,7 @@ unknown_config = 123
         let config = BarConfig::default();
         assert_eq!(config.model.symbol, "\u{f4be} ");
         assert_eq!(config.version.symbol, "\u{f412} ");
-        assert_eq!(config.context.symbol, "\u{f463} ");
+        assert_eq!(config.context.symbol, "\u{f4ed} ");
         assert_eq!(config.tokens.symbol, "\u{f4df} ");
         assert_eq!(config.cache.symbol, "\u{f49b} ");
         assert_eq!(config.cost.symbol, "\u{f439} ");

@@ -1,6 +1,7 @@
 use crate::config::{
-    Element, IconMode, Icons, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS, DURATION_ICONS,
-    GAUGE_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS,
+    Element, IconMode, Icons, ALERT_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS,
+    DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS,
+    VERSION_ICONS,
 };
 use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::input::Input;
@@ -11,15 +12,37 @@ const BRAILLE: [char; 9] = [
     '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}', '\u{28C7}', '\u{28E7}', '\u{28F7}',
     '\u{28FF}',
 ];
+const SHADE: [char; 5] = [' ', '░', '▒', '▓', '█'];
 const GREEN: &str = "\x1b[32m";
 const YELLOW: &str = "\x1b[33m";
 const RED: &str = "\x1b[31m";
-const BG_RED: &str = "\x1b[41m";
-const WHITE: &str = "\x1b[97m";
 const DIM: &str = "\x1b[2m";
 const RST: &str = "\x1b[0m";
 
-fn gauge_bar(pct: f64, width: usize, color: &str) -> String {
+const BG_RED: &str = "\x1b[41m";
+const BG_YELLOW: &str = "\x1b[43m";
+const BG_BLUE: &str = "\x1b[44m";
+const WHITE: &str = "\x1b[97m";
+const BLACK: &str = "\x1b[30m";
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum BarStyle {
+    Braille,
+    Block,
+    Shade,
+    Ascii,
+}
+
+pub fn parse_bar_style(s: &str) -> BarStyle {
+    match s {
+        "block" => BarStyle::Block,
+        "shade" => BarStyle::Shade,
+        "ascii" => BarStyle::Ascii,
+        _ => BarStyle::Braille,
+    }
+}
+
+fn braille_bar(pct: f64, width: usize, color: &str) -> String {
     let fill = pct / 100.0 * width as f64;
     let mut out = String::with_capacity(width * 16);
     for i in 0..width {
@@ -30,6 +53,62 @@ fn gauge_bar(pct: f64, width: usize, color: &str) -> String {
         out.push_str(RST);
     }
     out
+}
+
+fn block_bar(pct: f64, width: usize, color: &str) -> String {
+    let filled = ((pct / 100.0 * width as f64).round() as usize).min(width);
+    let mut out = String::with_capacity(width * 16);
+    for _ in 0..filled {
+        out.push_str(color);
+        out.push('▰');
+        out.push_str(RST);
+    }
+    for _ in filled..width {
+        out.push_str(DIM);
+        out.push('▱');
+        out.push_str(RST);
+    }
+    out
+}
+
+fn shade_bar(pct: f64, width: usize, color: &str) -> String {
+    let fill = pct / 100.0 * width as f64;
+    let mut out = String::with_capacity(width * 16);
+    for i in 0..width {
+        let level = ((fill - i as f64).clamp(0.0, 1.0) * 4.0).round() as usize;
+        let c = if level > 0 { color } else { DIM };
+        out.push_str(c);
+        out.push(SHADE[level]);
+        out.push_str(RST);
+    }
+    out
+}
+
+fn ascii_bar(pct: f64, width: usize, color: &str) -> String {
+    let filled = ((pct / 100.0 * width as f64).round() as usize).min(width);
+    let mut out = String::with_capacity(width + 16);
+    out.push('[');
+    out.push_str(color);
+    for _ in 0..filled {
+        out.push('#');
+    }
+    out.push_str(RST);
+    out.push_str(DIM);
+    for _ in filled..width {
+        out.push('-');
+    }
+    out.push_str(RST);
+    out.push(']');
+    out
+}
+
+pub fn render_bar(pct: f64, style: BarStyle, width: usize, color: &str) -> String {
+    match style {
+        BarStyle::Braille => braille_bar(pct, width, color),
+        BarStyle::Block => block_bar(pct, width, color),
+        BarStyle::Shade => shade_bar(pct, width, color),
+        BarStyle::Ascii => ascii_bar(pct, width, color),
+    }
 }
 
 fn pct_color(pct: f64) -> &'static str {
@@ -79,24 +158,32 @@ fn render_version(input: &Input, mode: IconMode, config: &BarConfig) -> Option<S
         &VERSION_ICONS, Some(format!("v{v}")))
 }
 
-fn render_gauge(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-    let cfg = &config.gauge;
-    let i = icon(&cfg.symbol, mode, &GAUGE_ICONS);
-    let pct = input.context_window.as_ref()?.used_percentage?;
-    let g = gauge_bar(pct, 10, pct_color(pct));
-    let mut out = format!("{i}{g}");
-    if input.exceeds_200k_tokens.unwrap_or(false) {
-        out.push_str(&format!(" {BG_RED}{WHITE} CTX EXCEEDED {RST}"));
-    }
-    Some(out)
-}
-
 fn render_context(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
     let cfg = &config.context;
-    let i = icon(&cfg.symbol, mode, &CONTEXT_ICONS);
     let pct = input.context_window.as_ref()?.used_percentage?;
-    let content = format!("{i}{}{pct:.0}%{RST}", pct_color(pct));
-    Some(apply_style(&content, &cfg.style))
+    if !cfg.show_bar && !cfg.show_pct { return None; }
+
+    let i = icon(&cfg.symbol, mode, &CONTEXT_ICONS);
+    let color = pct_color(pct);
+    let bar_style = parse_bar_style(&cfg.bar_style);
+
+    let mut out = String::from(i);
+
+    if cfg.show_bar {
+        out.push_str(&render_bar(pct, bar_style, cfg.width, color));
+    }
+    if cfg.show_bar && cfg.show_pct {
+        out.push(' ');
+    }
+    if cfg.show_pct {
+        out.push_str(&format!("{color}{pct:.0}%{RST}"));
+    }
+
+    if !cfg.style.is_empty() {
+        Some(apply_style(&out, &cfg.style))
+    } else {
+        Some(out)
+    }
 }
 
 fn render_tokens(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
@@ -159,11 +246,50 @@ fn render_output_style(input: &Input, mode: IconMode, config: &BarConfig) -> Opt
         &STYLE_ICONS, Some(format!("[{name}]")))
 }
 
+fn severity_style(severity: &str) -> (&'static str, &'static str) {
+    match severity {
+        "warn" => (BG_YELLOW, BLACK),
+        "info" => (BG_BLUE, WHITE),
+        _ => (BG_RED, WHITE),
+    }
+}
+
+fn render_alert(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let mut badges = Vec::new();
+
+    for rule in &config.alerts {
+        let fires = match rule.trigger.as_str() {
+            "ctx_exceeded" => input.exceeds_200k_tokens.unwrap_or(false),
+            "ctx_high" => {
+                if let Some(threshold) = rule.threshold {
+                    input.context_window.as_ref()
+                        .and_then(|cw| cw.used_percentage)
+                        .is_some_and(|pct| pct >= threshold)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+
+        if fires {
+            let (bg, fg) = severity_style(&rule.severity);
+            let i = icon("", mode, &ALERT_ICONS);
+            badges.push(format!("{i}{bg}{fg} {} {RST}", rule.label));
+        }
+    }
+
+    if badges.is_empty() {
+        None
+    } else {
+        Some(badges.join(" "))
+    }
+}
+
 pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
     match elem {
         Element::Model => render_model(input, mode, config),
         Element::Version => render_version(input, mode, config),
-        Element::Gauge => render_gauge(input, mode, config),
         Element::Context => render_context(input, mode, config),
         Element::Tokens => render_tokens(input, mode, config),
         Element::Cache => render_cache(input, mode, config),
@@ -173,5 +299,6 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig) 
         Element::Cwd => render_cwd(input, mode, config),
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),
+        Element::Alert => render_alert(input, mode, config),
     }
 }

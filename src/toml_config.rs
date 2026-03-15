@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::{
-    debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS, DURATION_ICONS, GAUGE_ICONS,
+    debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS, DURATION_ICONS,
     LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS,
 };
 
@@ -27,8 +27,6 @@ macro_rules! module_config {
 
 module_config!(ModelConfig,       MODEL_ICONS,    "cyan");
 module_config!(VersionConfig,     VERSION_ICONS,  "dim");
-module_config!(GaugeConfig,       GAUGE_ICONS,    "");
-module_config!(ContextConfig,     CONTEXT_ICONS,  "");
 module_config!(TokensConfig,      TOKENS_ICONS,   "dim");
 module_config!(CacheConfig,       CACHE_ICONS,    "dim");
 module_config!(CostConfig,        COST_ICONS,     "dim");
@@ -40,12 +38,51 @@ module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
+pub struct ContextConfig {
+    pub symbol: String,
+    pub style: String,
+    pub bar_style: String,
+    pub width: usize,
+    pub show_bar: bool,
+    pub show_pct: bool,
+}
+
+impl Default for ContextConfig {
+    fn default() -> Self {
+        Self {
+            symbol: CONTEXT_ICONS.oct.to_string(),
+            style: String::new(),
+            bar_style: "braille".to_string(),
+            width: 10,
+            show_bar: true,
+            show_pct: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AlertRule {
+    pub trigger: String,
+    #[serde(default = "AlertRule::default_label")]
+    pub label: String,
+    #[serde(default = "AlertRule::default_severity")]
+    pub severity: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f64>,
+}
+
+impl AlertRule {
+    fn default_label() -> String { "CTX EXCEEDED".into() }
+    fn default_severity() -> String { "error".into() }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct BarConfig {
     pub separator: String,
     pub layout: LayoutConfig,
     pub model: ModelConfig,
     pub version: VersionConfig,
-    pub gauge: GaugeConfig,
     pub context: ContextConfig,
     pub tokens: TokensConfig,
     pub cache: CacheConfig,
@@ -55,6 +92,8 @@ pub struct BarConfig {
     pub cwd: CwdConfig,
     pub project: ProjectDirConfig,
     pub style: OutputStyleConfig,
+    #[serde(rename = "alert")]
+    pub alerts: Vec<AlertRule>,
 }
 
 impl Default for BarConfig {
@@ -64,7 +103,6 @@ impl Default for BarConfig {
             layout: Default::default(),
             model: Default::default(),
             version: Default::default(),
-            gauge: Default::default(),
             context: Default::default(),
             tokens: Default::default(),
             cache: Default::default(),
@@ -74,6 +112,12 @@ impl Default for BarConfig {
             cwd: Default::default(),
             project: Default::default(),
             style: Default::default(),
+            alerts: vec![AlertRule {
+                trigger: "ctx_exceeded".into(),
+                label: "CTX EXCEEDED".into(),
+                severity: "error".into(),
+                threshold: None,
+            }],
         }
     }
 }
@@ -88,8 +132,8 @@ impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
             elements: [
-                "model", "version", "gauge", "context", "tokens", "cache",
-                "cost", "lines", "duration", "cwd", "project", "style",
+                "model", "version", "context", "tokens", "cache",
+                "cost", "lines", "duration", "cwd", "project", "style", "alert",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -219,8 +263,8 @@ unknown_config = 123
     fn test_default_layout_matches_all_elements_order() {
         let config = BarConfig::default();
         let expected = vec![
-            "model", "version", "gauge", "context", "tokens", "cache", "cost", "lines", "duration",
-            "cwd", "project", "style",
+            "model", "version", "context", "tokens", "cache", "cost", "lines", "duration",
+            "cwd", "project", "style", "alert",
         ];
         assert_eq!(config.layout.elements, expected);
     }
@@ -230,7 +274,6 @@ unknown_config = 123
         let config = BarConfig::default();
         assert_eq!(config.model.symbol, "\u{f4be} ");
         assert_eq!(config.version.symbol, "\u{f412} ");
-        assert_eq!(config.gauge.symbol, "\u{f4ed} ");
         assert_eq!(config.context.symbol, "\u{f463} ");
         assert_eq!(config.tokens.symbol, "\u{f4df} ");
         assert_eq!(config.cache.symbol, "\u{f49b} ");
@@ -245,7 +288,6 @@ unknown_config = 123
     #[test]
     fn test_dynamic_color_modules_have_empty_style() {
         let config = BarConfig::default();
-        assert_eq!(config.gauge.style, "");
         assert_eq!(config.context.style, "");
         assert_eq!(config.lines.style, "");
     }
@@ -346,8 +388,11 @@ style = "red"
         assert_eq!(original.model.style, deserialized.model.style);
         assert_eq!(original.version.symbol, deserialized.version.symbol);
         assert_eq!(original.version.style, deserialized.version.style);
-        assert_eq!(original.gauge.symbol, deserialized.gauge.symbol);
         assert_eq!(original.context.symbol, deserialized.context.symbol);
+        assert_eq!(original.context.bar_style, deserialized.context.bar_style);
+        assert_eq!(original.context.width, deserialized.context.width);
+        assert_eq!(original.context.show_bar, deserialized.context.show_bar);
+        assert_eq!(original.context.show_pct, deserialized.context.show_pct);
         assert_eq!(original.tokens.symbol, deserialized.tokens.symbol);
         assert_eq!(original.tokens.style, deserialized.tokens.style);
         assert_eq!(original.cache.symbol, deserialized.cache.symbol);
@@ -364,5 +409,60 @@ style = "red"
         assert_eq!(original.style.symbol, deserialized.style.symbol);
         assert_eq!(original.style.style, deserialized.style.style);
         assert_eq!(original.layout.elements, deserialized.layout.elements);
+        assert_eq!(original.alerts.len(), deserialized.alerts.len());
+        assert_eq!(original.alerts[0].trigger, deserialized.alerts[0].trigger);
+    }
+
+    #[test]
+    fn test_context_config_defaults() {
+        let config = BarConfig::default();
+        assert_eq!(config.context.bar_style, "braille");
+        assert_eq!(config.context.width, 10);
+        assert!(config.context.show_bar);
+        assert!(config.context.show_pct);
+    }
+
+    #[test]
+    fn test_context_config_partial_override() {
+        let toml_str = r#"
+[context]
+bar_style = "block"
+show_pct = false
+"#;
+        let config: BarConfig = toml::from_str(toml_str).expect("Should deserialize");
+        assert_eq!(config.context.bar_style, "block");
+        assert!(!config.context.show_pct);
+        assert!(config.context.show_bar);
+        assert_eq!(config.context.width, 10);
+    }
+
+    #[test]
+    fn test_default_alert_rules() {
+        let config = BarConfig::default();
+        assert_eq!(config.alerts.len(), 1);
+        assert_eq!(config.alerts[0].trigger, "ctx_exceeded");
+        assert_eq!(config.alerts[0].severity, "error");
+        assert!(config.alerts[0].threshold.is_none());
+    }
+
+    #[test]
+    fn test_alert_rules_deserialization() {
+        let toml_str = r#"
+[[alert]]
+trigger = "ctx_exceeded"
+label = "CTX EXCEEDED"
+severity = "error"
+
+[[alert]]
+trigger = "ctx_high"
+label = "CTX 90%+"
+severity = "warn"
+threshold = 90.0
+"#;
+        let config: BarConfig = toml::from_str(toml_str).expect("Should deserialize");
+        assert_eq!(config.alerts.len(), 2);
+        assert_eq!(config.alerts[0].trigger, "ctx_exceeded");
+        assert_eq!(config.alerts[1].trigger, "ctx_high");
+        assert_eq!(config.alerts[1].threshold, Some(90.0));
     }
 }

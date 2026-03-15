@@ -17,7 +17,7 @@ fn cmd() -> Command {
 fn config_layout_hides_element() {
     let mut config_file = NamedTempFile::new().unwrap();
     writeln!(config_file, "[layout]").unwrap();
-    writeln!(config_file, "elements = [\"gauge\", \"context\"]").unwrap();
+    writeln!(config_file, "elements = [\"context\"]").unwrap();
     config_file.flush().unwrap();
 
     let output = cmd()
@@ -72,7 +72,7 @@ fn config_custom_layout() {
     writeln!(config_file, "[layout]").unwrap();
     writeln!(
         config_file,
-        "elements = [\"context\", \"model\", \"gauge\"]"
+        "elements = [\"context\", \"model\"]"
     )
     .unwrap();
     config_file.flush().unwrap();

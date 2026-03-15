@@ -4,7 +4,6 @@ use clap::{CommandFactory, Parser};
 pub enum Element {
     Model,
     Version,
-    Gauge,
     Context,
     Tokens,
     Cache,
@@ -14,6 +13,7 @@ pub enum Element {
     Cwd,
     ProjectDir,
     OutputStyle,
+    Alert,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -31,7 +31,6 @@ pub struct Icons {
 
 pub const MODEL_ICONS: Icons       = Icons { none: "",     oct: "\u{f4be} ", fa: "\u{ee0d} " };
 pub const VERSION_ICONS: Icons     = Icons { none: "",     oct: "\u{f412} ", fa: "\u{f02b} " };
-pub const GAUGE_ICONS: Icons       = Icons { none: "",     oct: "\u{f4ed} ", fa: "\u{ef0d} " };
 pub const CONTEXT_ICONS: Icons     = Icons { none: "",     oct: "\u{f463} ", fa: "\u{eeb2} " };
 pub const TOKENS_ICONS: Icons      = Icons { none: "",     oct: "\u{f4df} ", fa: "\u{f292} " };
 pub const CACHE_ICONS: Icons       = Icons { none: "",     oct: "\u{f49b} ", fa: "\u{f1c0} " };
@@ -41,11 +40,11 @@ pub const DURATION_ICONS: Icons    = Icons { none: "api:", oct: "\u{f4e3} ", fa:
 pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa: "\u{f114} " };
 pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
 pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
+pub const ALERT_ICONS: Icons       = Icons { none: "",     oct: "\u{f421} ", fa: "\u{f071} " };
 
 const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
     Element::Version,
-    Element::Gauge,
     Element::Context,
     Element::Tokens,
     Element::Cache,
@@ -55,6 +54,7 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::Cwd,
     Element::ProjectDir,
     Element::OutputStyle,
+    Element::Alert,
 ];
 
 #[derive(Parser)]
@@ -87,7 +87,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements (model, version, gauge, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style)"
+        help = "Comma-separated elements (model, version, context/ctx/gauge, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert)"
     )]
     pub elements: Option<String>,
 
@@ -130,23 +130,23 @@ pub fn build_cli() -> clap::Command {
 
 pub(crate) fn preset_elements(name: &str) -> Option<Vec<Element>> {
     Some(match name {
-        "minimal" => vec![Element::Model, Element::Gauge, Element::Context],
+        "minimal" => vec![Element::Model, Element::Context, Element::Alert],
         "compact" => vec![
             Element::Model,
-            Element::Gauge,
             Element::Context,
             Element::Cost,
             Element::Cwd,
+            Element::Alert,
         ],
         "default" => vec![
             Element::Model,
-            Element::Gauge,
             Element::Context,
             Element::Tokens,
             Element::Duration,
             Element::Cwd,
             Element::ProjectDir,
             Element::OutputStyle,
+            Element::Alert,
         ],
         "full" => ALL_ELEMENTS.to_vec(),
         _ => return None,
@@ -157,8 +157,7 @@ fn parse_element(s: &str) -> Option<Element> {
     match s.trim() {
         "model" => Some(Element::Model),
         "version" => Some(Element::Version),
-        "gauge" => Some(Element::Gauge),
-        "context" | "ctx" => Some(Element::Context),
+        "gauge" | "context" | "ctx" => Some(Element::Context),
         "tokens" => Some(Element::Tokens),
         "cache" => Some(Element::Cache),
         "cost" => Some(Element::Cost),
@@ -167,6 +166,7 @@ fn parse_element(s: &str) -> Option<Element> {
         "cwd" => Some(Element::Cwd),
         "project" | "project_dir" => Some(Element::ProjectDir),
         "style" | "output_style" => Some(Element::OutputStyle),
+        "alert" => Some(Element::Alert),
         _ => None,
     }
 }
@@ -239,16 +239,16 @@ pub fn print_list() {
     eprint!(
         "\
 PRESETS
-  minimal        model, gauge, context
-  compact        model, gauge, context, cost, cwd
-  default        model, gauge, context, tokens, duration, cwd, project, style
+  minimal        model, context, alert
+  compact        model, context, cost, cwd, alert
+  default        model, context, tokens, duration, cwd, project, style, alert
   full           all elements
 
 ELEMENTS
   model          Model display name (e.g. Opus 4.6)
   version        Claude Code version
-  gauge          Braille-dot context usage bar (color-coded)
-  context, ctx   Context usage percentage
+  context, ctx   Context usage bar + percentage (configurable)
+    gauge        Alias for context
   tokens         Input/output token counts
   cache          Cache read/write token counts
   cost           Session cost in USD
@@ -259,6 +259,13 @@ ELEMENTS
     project_dir
   style,         Output style (hidden when \"default\")
     output_style
+  alert          Conditional badges (ctx exceeded, ctx high)
+
+BAR STYLES (for context element)
+  braille        Sub-cell braille dots (default, highest resolution)
+  block          Filled/empty blocks (▰▱)
+  shade          Gradient shading (█▓▒░)
+  ascii          Plain ASCII ([###-------])
 
 ICON SETS
   octicons       Octicons (default)
@@ -275,12 +282,11 @@ mod tests {
     #[test]
     fn test_parse_elements_all_element_names() {
         let result = parse_elements(
-            "model,version,gauge,context,tokens,cache,cost,lines,duration,cwd,project,style",
+            "model,version,context,tokens,cache,cost,lines,duration,cwd,project,style,alert",
         );
         assert_eq!(result.len(), 12);
         assert!(result.contains(&Element::Model));
         assert!(result.contains(&Element::Version));
-        assert!(result.contains(&Element::Gauge));
         assert!(result.contains(&Element::Context));
         assert!(result.contains(&Element::Tokens));
         assert!(result.contains(&Element::Cache));
@@ -290,35 +296,37 @@ mod tests {
         assert!(result.contains(&Element::Cwd));
         assert!(result.contains(&Element::ProjectDir));
         assert!(result.contains(&Element::OutputStyle));
+        assert!(result.contains(&Element::Alert));
     }
 
     #[test]
     fn test_parse_elements_aliases() {
-        let result = parse_elements("ctx,time,project_dir,output_style");
-        assert_eq!(result.len(), 4);
-        assert!(result.contains(&Element::Context));
-        assert!(result.contains(&Element::Duration));
-        assert!(result.contains(&Element::ProjectDir));
-        assert!(result.contains(&Element::OutputStyle));
+        let result = parse_elements("ctx,time,project_dir,output_style,gauge");
+        assert_eq!(result.len(), 5);
+        assert_eq!(result[0], Element::Context);
+        assert_eq!(result[1], Element::Duration);
+        assert_eq!(result[2], Element::ProjectDir);
+        assert_eq!(result[3], Element::OutputStyle);
+        assert_eq!(result[4], Element::Context);
     }
 
     #[test]
     fn test_parse_elements_mixed_aliases_and_names() {
-        let result = parse_elements("model,ctx,gauge,time,cwd");
+        let result = parse_elements("model,ctx,time,cwd,alert");
         assert_eq!(result.len(), 5);
         assert_eq!(result[0], Element::Model);
         assert_eq!(result[1], Element::Context);
-        assert_eq!(result[2], Element::Gauge);
-        assert_eq!(result[3], Element::Duration);
-        assert_eq!(result[4], Element::Cwd);
+        assert_eq!(result[2], Element::Duration);
+        assert_eq!(result[3], Element::Cwd);
+        assert_eq!(result[4], Element::Alert);
     }
 
     #[test]
     fn test_parse_elements_unknown_names_dropped() {
-        let result = parse_elements("model,unknown1,gauge,unknown2,cost");
+        let result = parse_elements("model,unknown1,context,unknown2,cost");
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], Element::Model);
-        assert_eq!(result[1], Element::Gauge);
+        assert_eq!(result[1], Element::Context);
         assert_eq!(result[2], Element::Cost);
     }
 
@@ -330,11 +338,11 @@ mod tests {
 
     #[test]
     fn test_parse_elements_whitespace_handling() {
-        let result = parse_elements(" model , gauge , context ");
+        let result = parse_elements(" model , context , alert ");
         assert_eq!(result.len(), 3);
         assert!(result.contains(&Element::Model));
-        assert!(result.contains(&Element::Gauge));
         assert!(result.contains(&Element::Context));
+        assert!(result.contains(&Element::Alert));
     }
 
     #[test]
@@ -344,8 +352,8 @@ mod tests {
         let elements = result.unwrap();
         assert_eq!(elements.len(), 3);
         assert_eq!(elements[0], Element::Model);
-        assert_eq!(elements[1], Element::Gauge);
-        assert_eq!(elements[2], Element::Context);
+        assert_eq!(elements[1], Element::Context);
+        assert_eq!(elements[2], Element::Alert);
     }
 
     #[test]
@@ -355,10 +363,10 @@ mod tests {
         let elements = result.unwrap();
         assert_eq!(elements.len(), 5);
         assert!(elements.contains(&Element::Model));
-        assert!(elements.contains(&Element::Gauge));
         assert!(elements.contains(&Element::Context));
         assert!(elements.contains(&Element::Cost));
         assert!(elements.contains(&Element::Cwd));
+        assert!(elements.contains(&Element::Alert));
     }
 
     #[test]
@@ -368,13 +376,13 @@ mod tests {
         let elements = result.unwrap();
         assert_eq!(elements.len(), 8);
         assert!(elements.contains(&Element::Model));
-        assert!(elements.contains(&Element::Gauge));
         assert!(elements.contains(&Element::Context));
         assert!(elements.contains(&Element::Tokens));
         assert!(elements.contains(&Element::Duration));
         assert!(elements.contains(&Element::Cwd));
         assert!(elements.contains(&Element::ProjectDir));
         assert!(elements.contains(&Element::OutputStyle));
+        assert!(elements.contains(&Element::Alert));
     }
 
     #[test]
@@ -431,6 +439,7 @@ mod tests {
         let result = resolve_elements(&cli, None);
         assert_eq!(result.len(), 5);
         assert!(result.contains(&Element::Cost));
+        assert!(result.contains(&Element::Alert));
     }
 
     #[test]

@@ -17,10 +17,13 @@ fn now_secs() -> u64 {
 }
 
 const SESSION_GAP_SECS: u64 = 7200;
+const MS_PER_HOUR: f64 = 3_600_000.0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsRecord {
     pub ts: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,6 +40,8 @@ pub struct StatsRecord {
     pub lines_del: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wall_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -100,6 +105,7 @@ pub fn append_record(input: &Input) {
 
     let record = StatsRecord {
         ts: now,
+        session_id: input.session_id.clone(),
         model: input.model.as_ref().and_then(|m| m.display_name.clone()),
         ctx_pct: input.context_window.as_ref().and_then(|c| c.used_percentage),
         in_tok: input.context_window.as_ref().and_then(|c| c.total_input_tokens),
@@ -108,6 +114,7 @@ pub fn append_record(input: &Input) {
         lines_add: input.cost.as_ref().and_then(|c| c.total_lines_added),
         lines_del: input.cost.as_ref().and_then(|c| c.total_lines_removed),
         api_ms: input.cost.as_ref().and_then(|c| c.total_api_duration_ms),
+        wall_ms: input.cost.as_ref().and_then(|c| c.total_duration_ms),
         project: input.workspace.as_ref().and_then(|w| w.project_dir.clone()),
         cache_read: input.cache_tokens().map(|(r, _)| r),
         cache_write: input.cache_tokens().map(|(_, w)| w),
@@ -193,10 +200,14 @@ pub fn detect_sessions(records: &[StatsRecord]) -> Vec<Session> {
 
         for r in recs {
             let is_boundary = if let Some(prev) = current.last() {
-                let cost_decreased =
-                    r.cost.unwrap_or(0.0) < prev.cost.unwrap_or(0.0) - 0.001;
-                let gap = r.ts.saturating_sub(prev.ts) > SESSION_GAP_SECS;
-                cost_decreased || gap
+                if r.session_id.is_some() || prev.session_id.is_some() {
+                    r.session_id != prev.session_id
+                } else {
+                    let cost_decreased =
+                        r.cost.unwrap_or(0.0) < prev.cost.unwrap_or(0.0) - 0.001;
+                    let gap = r.ts.saturating_sub(prev.ts) > SESSION_GAP_SECS;
+                    cost_decreased || gap
+                }
             } else {
                 false
             };
@@ -230,10 +241,18 @@ pub struct TodayStats {
     pub daily_budget_pct: Option<f64>,
 }
 
+fn cost_per_hour(cost: Option<f64>, ms: Option<u64>, min_ms: u64) -> Option<f64> {
+    match (cost, ms) {
+        (Some(c), Some(ms)) if ms >= min_ms => Some(c / (ms as f64 / MS_PER_HOUR)),
+        _ => None,
+    }
+}
+
 pub fn compute_today_stats(
     today_records: &[StatsRecord],
     current_cost: Option<f64>,
     current_api_ms: Option<u64>,
+    current_wall_ms: Option<u64>,
     current_out_tok: Option<u64>,
     budget_limit: Option<f64>,
 ) -> TodayStats {
@@ -251,27 +270,9 @@ pub fn compute_today_stats(
     };
     let daily_cost = completed_cost + current_cost.unwrap_or(0.0);
 
-    let burn_rate = match (current_cost, current_api_ms) {
-        (Some(c), Some(ms)) if ms >= 60_000 => {
-            let hours = ms as f64 / 3_600_000.0;
-            Some(c / hours)
-        }
-        _ => None,
-    };
+    let burn_rate = cost_per_hour(current_cost, current_api_ms, 60_000);
 
-    let spend_rate = if let Some(last_session) = sessions.last() {
-        let now = now_secs();
-        let elapsed = now.saturating_sub(last_session.start_ts());
-        match (current_cost, elapsed) {
-            (Some(c), e) if e >= 300 => {
-                let hours = e as f64 / 3600.0;
-                Some(c / hours)
-            }
-            _ => None,
-        }
-    } else {
-        None
-    };
+    let spend_rate = cost_per_hour(current_cost, current_wall_ms, 300_000);
 
     let tok_per_dollar = match (current_out_tok, current_cost) {
         (Some(tok), Some(c)) if c > 0.001 => Some(tok as f64 / c),
@@ -364,7 +365,7 @@ pub fn print_summary(records: &[StatsRecord], days: u64) {
         let avg_cost = total_cost / sessions.len() as f64;
         println!("Avg session  ${avg_cost:.2}");
         if total_api_ms > 0 {
-            let hours = total_api_ms as f64 / 3_600_000.0;
+            let hours = total_api_ms as f64 / MS_PER_HOUR;
             let tok_per_hr = total_out as f64 / hours;
             println!("Avg tok/hr   {}", format_tokens(tok_per_hr as u64));
         }
@@ -506,6 +507,7 @@ mod tests {
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
         StatsRecord {
             ts,
+            session_id: None,
             model: Some("Opus 4.6".into()),
             ctx_pct: Some(30.0),
             in_tok: Some(1000),
@@ -514,6 +516,7 @@ mod tests {
             lines_add: Some(10),
             lines_del: Some(5),
             api_ms: Some(120_000),
+            wall_ms: Some(600_000),
             project: Some(project.into()),
             cache_read: Some(800),
             cache_write: Some(200),
@@ -594,6 +597,32 @@ mod tests {
     }
 
     #[test]
+    fn detect_sessions_by_session_id() {
+        let mut r1 = record(1000, 1.0, "/proj");
+        r1.session_id = Some("aaa".into());
+        let mut r2 = record(1100, 2.0, "/proj");
+        r2.session_id = Some("aaa".into());
+        let mut r3 = record(1200, 3.0, "/proj");
+        r3.session_id = Some("bbb".into());
+        let sessions = detect_sessions(&[r1, r2, r3]);
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions[0].records.len(), 2);
+        assert_eq!(sessions[1].records.len(), 1);
+    }
+
+    #[test]
+    fn detect_sessions_mixed_session_id() {
+        let mut r1 = record(1000, 1.0, "/proj");
+        r1.session_id = Some("aaa".into());
+        let mut r2 = record(1100, 2.0, "/proj");
+        r2.session_id = None;
+        let mut r3 = record(1200, 3.0, "/proj");
+        r3.session_id = Some("aaa".into());
+        let sessions = detect_sessions(&[r1, r2, r3]);
+        assert_eq!(sessions.len(), 3);
+    }
+
+    #[test]
     fn compute_today_stats_basic() {
         let records = vec![
             record(1000, 1.0, "/proj"),
@@ -601,7 +630,7 @@ mod tests {
             record(1200, 0.5, "/proj"),
             record(1300, 1.5, "/proj"),
         ];
-        let stats = compute_today_stats(&records, Some(1.5), Some(120_000), Some(500), None);
+        let stats = compute_today_stats(&records, Some(1.5), Some(120_000), None, Some(500), None);
         assert!((stats.daily_cost - 3.5).abs() < 0.01);
         assert_eq!(stats.session_count, 2);
     }
@@ -609,28 +638,42 @@ mod tests {
     #[test]
     fn burn_rate_under_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(1.0), Some(30_000), Some(100), None);
+        let stats = compute_today_stats(&records, Some(1.0), Some(30_000), None, Some(100), None);
         assert!(stats.burn_rate.is_none());
     }
 
     #[test]
     fn burn_rate_over_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(6.0), Some(3_600_000), Some(100), None);
+        let stats = compute_today_stats(&records, Some(6.0), Some(3_600_000), None, Some(100), None);
         assert!((stats.burn_rate.unwrap() - 6.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn spend_rate_under_five_minutes() {
+        let records = vec![record(1000, 1.0, "/proj")];
+        let stats = compute_today_stats(&records, Some(1.0), Some(60_000), Some(200_000), Some(100), None);
+        assert!(stats.spend_rate.is_none());
+    }
+
+    #[test]
+    fn spend_rate_over_five_minutes() {
+        let records = vec![record(1000, 1.0, "/proj")];
+        let stats = compute_today_stats(&records, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None);
+        assert!((stats.spend_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn tok_per_dollar_zero_cost() {
         let records = vec![record(1000, 0.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(0.0), Some(60_000), Some(1000), None);
+        let stats = compute_today_stats(&records, Some(0.0), Some(60_000), None, Some(1000), None);
         assert!(stats.tok_per_dollar.is_none());
     }
 
     #[test]
     fn cost_vs_avg_single_session() {
         let records = vec![record(1000, 5.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(5.0), Some(60_000), Some(100), None);
+        let stats = compute_today_stats(&records, Some(5.0), Some(60_000), None, Some(100), None);
         assert!(stats.cost_vs_avg.is_none());
     }
 
@@ -638,7 +681,7 @@ mod tests {
     fn daily_budget_pct() {
         let records = vec![record(1000, 50.0, "/proj")];
         let stats =
-            compute_today_stats(&records, Some(50.0), Some(60_000), Some(100), Some(100.0));
+            compute_today_stats(&records, Some(50.0), Some(60_000), None, Some(100), Some(100.0));
         assert!((stats.daily_budget_pct.unwrap() - 50.0).abs() < 0.01);
     }
 
@@ -684,6 +727,7 @@ mod tests {
             .as_secs();
         let r = StatsRecord {
             ts: now,
+            session_id: Some("test-session".into()),
             model: Some("Opus 4.6".into()),
             ctx_pct: Some(30.0),
             in_tok: Some(3931),
@@ -692,6 +736,7 @@ mod tests {
             lines_add: Some(438),
             lines_del: Some(265),
             api_ms: Some(1_019_272),
+            wall_ms: Some(6_887_404),
             project: Some("/Users/demo/Git/my-project".into()),
             cache_read: Some(58984),
             cache_write: Some(1505),

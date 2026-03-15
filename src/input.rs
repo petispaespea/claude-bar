@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Input {
+    pub session_id: Option<String>,
     pub model: Option<Model>,
     pub context_window: Option<ContextWindow>,
     pub cost: Option<Cost>,
@@ -47,6 +48,7 @@ pub struct Cost {
     pub total_lines_added: Option<i64>,
     pub total_lines_removed: Option<i64>,
     pub total_api_duration_ms: Option<u64>,
+    pub total_duration_ms: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -61,6 +63,7 @@ pub struct Workspace {
 
 pub fn demo() -> Input {
     Input {
+        session_id: Some("demo-session-001".into()),
         model: Some(Model {
             display_name: Some("Opus 4.6".into()),
         }),
@@ -78,6 +81,7 @@ pub fn demo() -> Input {
             total_lines_added: Some(438),
             total_lines_removed: Some(265),
             total_api_duration_ms: Some(1_019_272),
+            total_duration_ms: Some(6_887_404),
         }),
         cwd: Some("/Users/demo/Git/my-project".into()),
         version: Some("2.1.69".into()),

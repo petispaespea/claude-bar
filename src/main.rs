@@ -81,6 +81,7 @@ fn main() {
         let today = stats::load_today_records();
         let current_cost = input.cost.as_ref().and_then(|c| c.total_cost_usd);
         let current_api_ms = input.cost.as_ref().and_then(|c| c.total_api_duration_ms);
+        let current_wall_ms = input.cost.as_ref().and_then(|c| c.total_duration_ms);
         let current_out_tok = input.context_window.as_ref().and_then(|c| c.total_output_tokens);
         let budget_limit = if config.daily_budget.limit > 0.0 {
             Some(config.daily_budget.limit)
@@ -91,6 +92,7 @@ fn main() {
             &today,
             current_cost,
             current_api_ms,
+            current_wall_ms,
             current_out_tok,
             budget_limit,
         ))

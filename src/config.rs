@@ -77,6 +77,16 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::CtxTrend,
 ];
 
+pub const CORE_ELEMENT_NAMES: &[&str] = &[
+    "model", "version", "context", "tokens", "cache",
+    "cost", "lines", "duration", "cwd", "project", "style", "alert",
+];
+
+pub const STATS_ELEMENT_NAMES: &[&str] = &[
+    "daily_cost", "burn_rate", "spend_rate", "session_count",
+    "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
+];
+
 pub const ALL_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
     "cost", "lines", "duration", "cwd", "project", "style", "alert",
@@ -85,6 +95,7 @@ pub const ALL_ELEMENT_NAMES: &[&str] = &[
 ];
 
 const _: () = assert!(ALL_ELEMENTS.len() == ALL_ELEMENT_NAMES.len());
+const _: () = assert!(CORE_ELEMENT_NAMES.len() + STATS_ELEMENT_NAMES.len() == ALL_ELEMENT_NAMES.len());
 
 #[derive(Parser)]
 #[command(
@@ -116,7 +127,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements (model, version, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
+        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
     )]
     pub elements: Option<String>,
 
@@ -224,8 +235,23 @@ fn parse_element(s: &str) -> Option<Element> {
     }
 }
 
-pub(crate) fn parse_elements(spec: &str) -> Vec<Element> {
-    spec.split(',').filter_map(parse_element).collect()
+pub const LINE_BREAK: &str = "---";
+
+fn split_into_lines<'a>(tokens: impl Iterator<Item = &'a str>) -> Vec<Vec<Element>> {
+    let mut lines = vec![Vec::new()];
+    for token in tokens {
+        if token.trim() == LINE_BREAK {
+            lines.push(Vec::new());
+        } else if let Some(elem) = parse_element(token) {
+            lines.last_mut().unwrap().push(elem);
+        }
+    }
+    lines.retain(|l| !l.is_empty());
+    lines
+}
+
+pub(crate) fn parse_elements(spec: &str) -> Vec<Vec<Element>> {
+    split_into_lines(spec.split(','))
 }
 
 pub(crate) fn env(key: &str) -> Option<String> {
@@ -238,17 +264,17 @@ pub(crate) fn debug(msg: &str) {
     }
 }
 
-pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Element> {
+pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<Element>> {
     if let Some(ref spec) = cli.elements {
         debug(&format!("elements: using --elements {spec}"));
         return parse_elements(spec);
     }
     if let Some(ref name) = cli.preset {
         debug(&format!("elements: using --preset {name}"));
-        return preset_elements(name).unwrap_or_else(|| {
-            eprintln!("Unknown preset: {name}. Use --list to see available presets.");
+        return vec![preset_elements(name).unwrap_or_else(|| {
+            eprintln!("Unknown preset: {name}. Use --info to see available presets.");
             std::process::exit(1);
-        });
+        })];
     }
     if let Some(val) = env("CLAUDE_BAR") {
         if val.contains(',') {
@@ -257,15 +283,15 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Elemen
         }
         if let Some(elems) = preset_elements(&val) {
             debug(&format!("elements: using $CLAUDE_BAR preset {val}"));
-            return elems;
+            return vec![elems];
         }
     }
     if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
         debug(&format!("elements: using TOML layout [{}]", layout.join(", ")));
-        return layout.iter().filter_map(|s| parse_element(s)).collect();
+        return split_into_lines(layout.iter().map(|s| s.as_str()));
     }
     debug("elements: using built-in default preset");
-    preset_elements("default").unwrap()
+    vec![preset_elements("default").unwrap()]
 }
 
 pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
@@ -337,6 +363,11 @@ ICON SETS
   octicons       Octicons (default)
   fontawesome    Font Awesome (alias: fa)
   none, off      No icons (text prefixes for paths)
+
+MULTI-LINE LAYOUT
+  Use \"---\" in layout.elements to split into multiple lines.
+  Example: elements = [\"model\", \"context\", \"---\", \"cost\", \"duration\"]
+  With --elements: --elements model,context,---,cost,duration
 "
     );
 }
@@ -370,49 +401,54 @@ mod tests {
         let result = parse_elements(
             "model,version,context,tokens,cache,cost,lines,duration,cwd,project,style,alert",
         );
-        assert_eq!(result.len(), 12);
-        assert!(result.contains(&Element::Model));
-        assert!(result.contains(&Element::Version));
-        assert!(result.contains(&Element::Context));
-        assert!(result.contains(&Element::Tokens));
-        assert!(result.contains(&Element::Cache));
-        assert!(result.contains(&Element::Cost));
-        assert!(result.contains(&Element::Lines));
-        assert!(result.contains(&Element::Duration));
-        assert!(result.contains(&Element::Cwd));
-        assert!(result.contains(&Element::ProjectDir));
-        assert!(result.contains(&Element::OutputStyle));
-        assert!(result.contains(&Element::Alert));
+        assert_eq!(result.len(), 1);
+        let line = &result[0];
+        assert_eq!(line.len(), 12);
+        assert!(line.contains(&Element::Model));
+        assert!(line.contains(&Element::Version));
+        assert!(line.contains(&Element::Context));
+        assert!(line.contains(&Element::Tokens));
+        assert!(line.contains(&Element::Cache));
+        assert!(line.contains(&Element::Cost));
+        assert!(line.contains(&Element::Lines));
+        assert!(line.contains(&Element::Duration));
+        assert!(line.contains(&Element::Cwd));
+        assert!(line.contains(&Element::ProjectDir));
+        assert!(line.contains(&Element::OutputStyle));
+        assert!(line.contains(&Element::Alert));
     }
 
     #[test]
     fn test_parse_elements_aliases() {
         let result = parse_elements("ctx,time,project_dir,output_style");
-        assert_eq!(result.len(), 4);
-        assert_eq!(result[0], Element::Context);
-        assert_eq!(result[1], Element::Duration);
-        assert_eq!(result[2], Element::ProjectDir);
-        assert_eq!(result[3], Element::OutputStyle);
+        let line = &result[0];
+        assert_eq!(line.len(), 4);
+        assert_eq!(line[0], Element::Context);
+        assert_eq!(line[1], Element::Duration);
+        assert_eq!(line[2], Element::ProjectDir);
+        assert_eq!(line[3], Element::OutputStyle);
     }
 
     #[test]
     fn test_parse_elements_mixed_aliases_and_names() {
         let result = parse_elements("model,ctx,time,cwd,alert");
-        assert_eq!(result.len(), 5);
-        assert_eq!(result[0], Element::Model);
-        assert_eq!(result[1], Element::Context);
-        assert_eq!(result[2], Element::Duration);
-        assert_eq!(result[3], Element::Cwd);
-        assert_eq!(result[4], Element::Alert);
+        let line = &result[0];
+        assert_eq!(line.len(), 5);
+        assert_eq!(line[0], Element::Model);
+        assert_eq!(line[1], Element::Context);
+        assert_eq!(line[2], Element::Duration);
+        assert_eq!(line[3], Element::Cwd);
+        assert_eq!(line[4], Element::Alert);
     }
 
     #[test]
     fn test_parse_elements_unknown_names_dropped() {
         let result = parse_elements("model,unknown1,context,unknown2,cost");
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0], Element::Model);
-        assert_eq!(result[1], Element::Context);
-        assert_eq!(result[2], Element::Cost);
+        let line = &result[0];
+        assert_eq!(line.len(), 3);
+        assert_eq!(line[0], Element::Model);
+        assert_eq!(line[1], Element::Context);
+        assert_eq!(line[2], Element::Cost);
     }
 
     #[test]
@@ -424,10 +460,11 @@ mod tests {
     #[test]
     fn test_parse_elements_whitespace_handling() {
         let result = parse_elements(" model , context , alert ");
-        assert_eq!(result.len(), 3);
-        assert!(result.contains(&Element::Model));
-        assert!(result.contains(&Element::Context));
-        assert!(result.contains(&Element::Alert));
+        let line = &result[0];
+        assert_eq!(line.len(), 3);
+        assert!(line.contains(&Element::Model));
+        assert!(line.contains(&Element::Context));
+        assert!(line.contains(&Element::Alert));
     }
 
     #[test]
@@ -492,17 +529,18 @@ mod tests {
         let result = parse_elements(
             "daily_cost,burn_rate,spend_rate,session_count,daily_budget,tok_per_dollar,cache_hit_rate,cost_vs_avg,ctx_trend",
         );
-        assert_eq!(result.len(), 9);
-        assert!(result.contains(&Element::DailyCost));
-        assert!(result.contains(&Element::SpendRate));
-        assert!(result.contains(&Element::CacheHitRate));
+        let line = &result[0];
+        assert_eq!(line.len(), 9);
+        assert!(line.contains(&Element::DailyCost));
+        assert!(line.contains(&Element::SpendRate));
+        assert!(line.contains(&Element::CacheHitRate));
     }
 
     #[test]
     fn test_parse_elements_cache_hit_alias() {
         let result = parse_elements("cache_hit");
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0], Element::CacheHitRate);
+        assert_eq!(result[0].len(), 1);
+        assert_eq!(result[0][0], Element::CacheHitRate);
     }
 
     #[test]
@@ -516,14 +554,23 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_elements_line_separator() {
+        let result = parse_elements("model,context,---,cost,duration");
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], vec![Element::Model, Element::Context]);
+        assert_eq!(result[1], vec![Element::Cost, Element::Duration]);
+    }
+
+    #[test]
     fn test_resolve_elements_cli_precedence() {
         let mut cli = test_cli();
         cli.preset = Some("minimal".into());
         cli.elements = Some("model,cost".into());
         let result = resolve_elements(&cli, None);
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0], Element::Model);
-        assert_eq!(result[1], Element::Cost);
+        let line = &result[0];
+        assert_eq!(line.len(), 2);
+        assert_eq!(line[0], Element::Model);
+        assert_eq!(line[1], Element::Cost);
     }
 
     #[test]
@@ -531,9 +578,10 @@ mod tests {
         let mut cli = test_cli();
         cli.preset = Some("compact".into());
         let result = resolve_elements(&cli, None);
-        assert_eq!(result.len(), 5);
-        assert!(result.contains(&Element::Cost));
-        assert!(result.contains(&Element::Alert));
+        let line = &result[0];
+        assert_eq!(line.len(), 5);
+        assert!(line.contains(&Element::Cost));
+        assert!(line.contains(&Element::Alert));
     }
 
     #[test]

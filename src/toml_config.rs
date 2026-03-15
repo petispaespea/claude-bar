@@ -281,7 +281,11 @@ pub fn default_config_toml() -> String {
 # Empty style \"\" means the element controls its own color dynamically.
 ";
     let mut config = BarConfig::default();
-    config.layout.elements = crate::config::ALL_ELEMENT_NAMES.iter().map(|s| s.to_string()).collect();
+    let mut elements: Vec<String> = crate::config::CORE_ELEMENT_NAMES
+        .iter().map(|s| s.to_string()).collect();
+    elements.push(crate::config::LINE_BREAK.to_string());
+    elements.extend(crate::config::STATS_ELEMENT_NAMES.iter().map(|s| s.to_string()));
+    config.layout.elements = elements;
     let body = toml::to_string_pretty(&config).unwrap();
     format!("{header}\n{body}")
 }

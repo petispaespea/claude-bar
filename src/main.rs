@@ -100,9 +100,15 @@ fn main() {
 
     let out: String = elements
         .iter()
-        .filter_map(|e| render::render(*e, &input, icon_mode, &config, &today_stats))
+        .map(|line| {
+            line.iter()
+                .filter_map(|e| render::render(*e, &input, icon_mode, &config, &today_stats))
+                .collect::<Vec<_>>()
+                .join(&config.separator)
+        })
+        .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
-        .join(&config.separator);
+        .join("\n");
 
     print!("{out}");
 }

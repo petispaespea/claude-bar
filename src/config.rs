@@ -23,6 +23,25 @@ pub enum IconMode {
     FontAwesome,
 }
 
+pub struct Icons {
+    pub none: &'static str,
+    pub oct: &'static str,
+    pub fa: &'static str,
+}
+
+pub const MODEL_ICONS: Icons       = Icons { none: "",     oct: "\u{f4be} ", fa: "\u{ee0d} " };
+pub const VERSION_ICONS: Icons     = Icons { none: "",     oct: "\u{f412} ", fa: "\u{f02b} " };
+pub const GAUGE_ICONS: Icons       = Icons { none: "",     oct: "\u{f4ed} ", fa: "\u{ef0d} " };
+pub const CONTEXT_ICONS: Icons     = Icons { none: "",     oct: "\u{f463} ", fa: "\u{eeb2} " };
+pub const TOKENS_ICONS: Icons      = Icons { none: "",     oct: "\u{f4df} ", fa: "\u{f292} " };
+pub const CACHE_ICONS: Icons       = Icons { none: "",     oct: "\u{f49b} ", fa: "\u{f1c0} " };
+pub const COST_ICONS: Icons        = Icons { none: "",     oct: "\u{f439} ", fa: "\u{f09d} " };
+pub const LINES_ICONS: Icons       = Icons { none: "",     oct: "\u{f4d2} ", fa: "\u{f05f} " };
+pub const DURATION_ICONS: Icons    = Icons { none: "api:", oct: "\u{f4e3} ", fa: "\u{f254} " };
+pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa: "\u{f114} " };
+pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
+pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
+
 const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
     Element::Version,

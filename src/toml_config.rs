@@ -1,7 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+use crate::config::{
+    debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, CWD_ICONS, DURATION_ICONS, GAUGE_ICONS,
+    LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS,
+};
+
 macro_rules! module_config {
-    ($name:ident, $symbol:expr, $style:expr) => {
+    ($name:ident, $icons:expr, $style:expr) => {
         #[derive(Debug, Clone, Deserialize, Serialize)]
         #[serde(default)]
         pub struct $name {
@@ -12,7 +17,7 @@ macro_rules! module_config {
         impl Default for $name {
             fn default() -> Self {
                 Self {
-                    symbol: $symbol.to_string(),
+                    symbol: $icons.oct.to_string(),
                     style: $style.to_string(),
                 }
             }
@@ -20,18 +25,18 @@ macro_rules! module_config {
     };
 }
 
-module_config!(ModelConfig,       "\u{f4be} ", "cyan");
-module_config!(VersionConfig,     "\u{f412} ", "dim");
-module_config!(GaugeConfig,       "\u{f4ed} ", "");
-module_config!(ContextConfig,     "\u{f463} ", "");
-module_config!(TokensConfig,      "\u{f4df} ", "dim");
-module_config!(CacheConfig,       "\u{f49b} ", "dim");
-module_config!(CostConfig,        "\u{f439} ", "dim");
-module_config!(LinesConfig,       "\u{f4d2} ", "");
-module_config!(DurationConfig,    "\u{f4e3} ", "dim");
-module_config!(CwdConfig,         "\u{f413} ", "dim");
-module_config!(ProjectDirConfig,  "\u{f46d} ", "dim");
-module_config!(OutputStyleConfig, "\u{f48f} ", "dim");
+module_config!(ModelConfig,       MODEL_ICONS,    "cyan");
+module_config!(VersionConfig,     VERSION_ICONS,  "dim");
+module_config!(GaugeConfig,       GAUGE_ICONS,    "");
+module_config!(ContextConfig,     CONTEXT_ICONS,  "");
+module_config!(TokensConfig,      TOKENS_ICONS,   "dim");
+module_config!(CacheConfig,       CACHE_ICONS,    "dim");
+module_config!(CostConfig,        COST_ICONS,     "dim");
+module_config!(LinesConfig,       LINES_ICONS,    "");
+module_config!(DurationConfig,    DURATION_ICONS,  "dim");
+module_config!(CwdConfig,         CWD_ICONS,      "dim");
+module_config!(ProjectDirConfig,  PROJECT_ICONS,   "dim");
+module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -92,8 +97,6 @@ impl Default for LayoutConfig {
         }
     }
 }
-
-use crate::config::{debug, env};
 
 fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
     use std::path::PathBuf;

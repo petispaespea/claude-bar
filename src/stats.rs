@@ -32,42 +32,18 @@ pub struct StatsRecord {
 }
 
 impl StatsRecord {
-    pub fn cost(&self) -> Option<f64> {
-        self.input.cost.as_ref()?.total_cost_usd
-    }
-    pub fn session_id(&self) -> Option<&str> {
-        self.input.session_id.as_deref()
-    }
-    pub fn project(&self) -> Option<&str> {
-        self.input.workspace.as_ref()?.project_dir.as_deref()
-    }
-    pub fn model_name(&self) -> Option<&str> {
-        self.input.model.as_ref()?.display_name.as_deref()
-    }
-    pub fn ctx_pct(&self) -> Option<f64> {
-        self.input.context_window.as_ref()?.used_percentage
-    }
-    pub fn in_tok(&self) -> Option<u64> {
-        self.input.context_window.as_ref()?.total_input_tokens
-    }
-    pub fn out_tok(&self) -> Option<u64> {
-        self.input.context_window.as_ref()?.total_output_tokens
-    }
-    pub fn api_ms(&self) -> Option<u64> {
-        self.input.cost.as_ref()?.total_api_duration_ms
-    }
-    pub fn lines_add(&self) -> Option<i64> {
-        self.input.cost.as_ref()?.total_lines_added
-    }
-    pub fn lines_del(&self) -> Option<i64> {
-        self.input.cost.as_ref()?.total_lines_removed
-    }
-    pub fn cache_read(&self) -> Option<u64> {
-        self.input.cache_tokens().map(|(r, _)| r)
-    }
-    pub fn cache_write(&self) -> Option<u64> {
-        self.input.cache_tokens().map(|(_, w)| w)
-    }
+    pub fn cost(&self) -> Option<f64> { self.input.cost_usd() }
+    pub fn session_id(&self) -> Option<&str> { self.input.session_id.as_deref() }
+    pub fn project(&self) -> Option<&str> { self.input.project_dir() }
+    pub fn model_name(&self) -> Option<&str> { self.input.model_name() }
+    pub fn ctx_pct(&self) -> Option<f64> { self.input.ctx_pct() }
+    pub fn in_tok(&self) -> Option<u64> { self.input.in_tok() }
+    pub fn out_tok(&self) -> Option<u64> { self.input.out_tok() }
+    pub fn api_ms(&self) -> Option<u64> { self.input.api_ms() }
+    pub fn lines_add(&self) -> Option<i64> { self.input.lines_add() }
+    pub fn lines_del(&self) -> Option<i64> { self.input.lines_del() }
+    pub fn cache_read(&self) -> Option<u64> { self.input.cache_tokens().map(|(r, _)| r) }
+    pub fn cache_write(&self) -> Option<u64> { self.input.cache_tokens().map(|(_, w)| w) }
 }
 
 #[derive(Debug)]
@@ -543,42 +519,13 @@ pub fn clear_stats(yes: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::{ContextWindow, CurrentUsage, Model, Workspace};
 
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
-        StatsRecord {
-            v: STATS_VERSION,
-            ts,
-            input: Input {
-                session_id: None,
-                model: Some(Model {
-                    display_name: Some("Opus 4.6".into()),
-                }),
-                context_window: Some(ContextWindow {
-                    used_percentage: Some(30.0),
-                    total_input_tokens: Some(1000),
-                    total_output_tokens: Some(500),
-                    current_usage: Some(CurrentUsage {
-                        cache_read_input_tokens: Some(800),
-                        cache_creation_input_tokens: Some(200),
-                    }),
-                }),
-                cost: Some(crate::input::Cost {
-                    total_cost_usd: Some(cost),
-                    total_lines_added: Some(10),
-                    total_lines_removed: Some(5),
-                    total_api_duration_ms: Some(120_000),
-                    total_duration_ms: Some(600_000),
-                }),
-                cwd: None,
-                version: None,
-                exceeds_200k_tokens: None,
-                output_style: None,
-                workspace: Some(Workspace {
-                    project_dir: Some(project.into()),
-                }),
-            },
-        }
+        let mut input = crate::input::demo();
+        input.session_id = None;
+        input.cost.as_mut().unwrap().total_cost_usd = Some(cost);
+        input.workspace.as_mut().unwrap().project_dir = Some(project.into());
+        StatsRecord { v: STATS_VERSION, ts, input }
     }
 
     #[test]
@@ -786,35 +733,7 @@ mod tests {
         let r = StatsRecord {
             v: STATS_VERSION,
             ts: now,
-            input: Input {
-                session_id: Some("test-session".into()),
-                model: Some(Model {
-                    display_name: Some("Opus 4.6".into()),
-                }),
-                context_window: Some(ContextWindow {
-                    used_percentage: Some(30.0),
-                    total_input_tokens: Some(3931),
-                    total_output_tokens: Some(28564),
-                    current_usage: Some(CurrentUsage {
-                        cache_read_input_tokens: Some(58984),
-                        cache_creation_input_tokens: Some(1505),
-                    }),
-                }),
-                cost: Some(crate::input::Cost {
-                    total_cost_usd: Some(4.11),
-                    total_lines_added: Some(438),
-                    total_lines_removed: Some(265),
-                    total_api_duration_ms: Some(1_019_272),
-                    total_duration_ms: Some(6_887_404),
-                }),
-                cwd: Some("/Users/demo/Git/my-project".into()),
-                version: Some("2.1.69".into()),
-                exceeds_200k_tokens: None,
-                output_style: None,
-                workspace: Some(Workspace {
-                    project_dir: Some("/Users/demo/Git/my-project".into()),
-                }),
-            },
+            input: crate::input::demo(),
         };
 
         let line = serde_json::to_string(&r).unwrap();

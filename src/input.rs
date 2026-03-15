@@ -21,6 +21,33 @@ impl Input {
             u.cache_creation_input_tokens.unwrap_or(0),
         ))
     }
+    pub fn cost_usd(&self) -> Option<f64> {
+        self.cost.as_ref()?.total_cost_usd
+    }
+    pub fn model_name(&self) -> Option<&str> {
+        self.model.as_ref()?.display_name.as_deref()
+    }
+    pub fn project_dir(&self) -> Option<&str> {
+        self.workspace.as_ref()?.project_dir.as_deref()
+    }
+    pub fn ctx_pct(&self) -> Option<f64> {
+        self.context_window.as_ref()?.used_percentage
+    }
+    pub fn in_tok(&self) -> Option<u64> {
+        self.context_window.as_ref()?.total_input_tokens
+    }
+    pub fn out_tok(&self) -> Option<u64> {
+        self.context_window.as_ref()?.total_output_tokens
+    }
+    pub fn api_ms(&self) -> Option<u64> {
+        self.cost.as_ref()?.total_api_duration_ms
+    }
+    pub fn lines_add(&self) -> Option<i64> {
+        self.cost.as_ref()?.total_lines_added
+    }
+    pub fn lines_del(&self) -> Option<i64> {
+        self.cost.as_ref()?.total_lines_removed
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

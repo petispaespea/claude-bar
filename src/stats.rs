@@ -20,39 +20,54 @@ const SESSION_GAP_SECS: u64 = 7200;
 const MS_PER_HOUR: f64 = 3_600_000.0;
 const SECS_PER_DAY: u64 = 86_400;
 
-const STATS_VERSION: u8 = 1;
+const STATS_VERSION: u8 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsRecord {
     #[serde(default)]
     pub v: u8,
     pub ts: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ctx_pct: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub in_tok: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub out_tok: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cost: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lines_add: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lines_del: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub api_ms: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub wall_ms: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub project: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_read: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_write: Option<u64>,
+    #[serde(flatten)]
+    pub input: Input,
+}
+
+impl StatsRecord {
+    pub fn cost(&self) -> Option<f64> {
+        self.input.cost.as_ref()?.total_cost_usd
+    }
+    pub fn session_id(&self) -> Option<&str> {
+        self.input.session_id.as_deref()
+    }
+    pub fn project(&self) -> Option<&str> {
+        self.input.workspace.as_ref()?.project_dir.as_deref()
+    }
+    pub fn model_name(&self) -> Option<&str> {
+        self.input.model.as_ref()?.display_name.as_deref()
+    }
+    pub fn ctx_pct(&self) -> Option<f64> {
+        self.input.context_window.as_ref()?.used_percentage
+    }
+    pub fn in_tok(&self) -> Option<u64> {
+        self.input.context_window.as_ref()?.total_input_tokens
+    }
+    pub fn out_tok(&self) -> Option<u64> {
+        self.input.context_window.as_ref()?.total_output_tokens
+    }
+    pub fn api_ms(&self) -> Option<u64> {
+        self.input.cost.as_ref()?.total_api_duration_ms
+    }
+    pub fn lines_add(&self) -> Option<i64> {
+        self.input.cost.as_ref()?.total_lines_added
+    }
+    pub fn lines_del(&self) -> Option<i64> {
+        self.input.cost.as_ref()?.total_lines_removed
+    }
+    pub fn cache_read(&self) -> Option<u64> {
+        self.input.cache_tokens().map(|(r, _)| r)
+    }
+    pub fn cache_write(&self) -> Option<u64> {
+        self.input.cache_tokens().map(|(_, w)| w)
+    }
 }
 
 #[derive(Debug)]
@@ -61,9 +76,9 @@ pub struct Session<'a> {
 }
 
 macro_rules! session_final {
-    ($name:ident, $field:ident, $ty:ty, $default:expr) => {
+    ($name:ident, $method:ident, $ty:ty, $default:expr) => {
         pub fn $name(&self) -> $ty {
-            self.records.last().and_then(|r| r.$field).unwrap_or($default)
+            self.records.last().and_then(|r| r.$method()).unwrap_or($default)
         }
     };
 }
@@ -77,11 +92,11 @@ impl Session<'_> {
     session_final!(final_lines_del, lines_del, i64, 0);
 
     pub fn model(&self) -> Option<&str> {
-        self.records.iter().rev().find_map(|r| r.model.as_deref())
+        self.records.iter().rev().find_map(|r| r.model_name())
     }
 
     pub fn project(&self) -> Option<&str> {
-        self.records.iter().rev().find_map(|r| r.project.as_deref())
+        self.records.iter().rev().find_map(|r| r.project())
     }
 
     pub fn start_ts(&self) -> u64 {
@@ -115,19 +130,7 @@ pub fn append_record(input: &Input) {
     let record = StatsRecord {
         v: STATS_VERSION,
         ts: now,
-        session_id: input.session_id.clone(),
-        model: input.model.as_ref().and_then(|m| m.display_name.clone()),
-        ctx_pct: input.context_window.as_ref().and_then(|c| c.used_percentage),
-        in_tok: input.context_window.as_ref().and_then(|c| c.total_input_tokens),
-        out_tok: input.context_window.as_ref().and_then(|c| c.total_output_tokens),
-        cost: input.cost.as_ref().and_then(|c| c.total_cost_usd),
-        lines_add: input.cost.as_ref().and_then(|c| c.total_lines_added),
-        lines_del: input.cost.as_ref().and_then(|c| c.total_lines_removed),
-        api_ms: input.cost.as_ref().and_then(|c| c.total_api_duration_ms),
-        wall_ms: input.cost.as_ref().and_then(|c| c.total_duration_ms),
-        project: input.workspace.as_ref().and_then(|w| w.project_dir.clone()),
-        cache_read: input.cache_tokens().map(|(r, _)| r),
-        cache_write: input.cache_tokens().map(|(_, w)| w),
+        input: input.clone(),
     };
 
     let Ok(line) = serde_json::to_string(&record) else {
@@ -211,7 +214,7 @@ fn load_from_file(
             continue;
         }
         if let Some(proj) = project {
-            if record.project.as_deref() != Some(proj) {
+            if record.project() != Some(proj) {
                 continue;
             }
         }
@@ -226,7 +229,7 @@ pub fn load_today_records() -> Vec<StatsRecord> {
 pub fn detect_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
     let mut by_project: HashMap<&str, Vec<&'a StatsRecord>> = HashMap::new();
     for r in records {
-        let key = r.project.as_deref().unwrap_or("");
+        let key = r.project().unwrap_or("");
         by_project.entry(key).or_default().push(r);
     }
 
@@ -237,11 +240,11 @@ pub fn detect_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
 
         for r in recs {
             let is_boundary = if let Some(prev) = current.last() {
-                if r.session_id.is_some() || prev.session_id.is_some() {
-                    r.session_id != prev.session_id
+                if r.session_id().is_some() || prev.session_id().is_some() {
+                    r.session_id() != prev.session_id()
                 } else {
                     let cost_decreased =
-                        r.cost.unwrap_or(0.0) < prev.cost.unwrap_or(0.0) - 0.001;
+                        r.cost().unwrap_or(0.0) < prev.cost().unwrap_or(0.0) - 0.001;
                     let gap = r.ts.saturating_sub(prev.ts) > SESSION_GAP_SECS;
                     cost_decreased || gap
                 }
@@ -353,13 +356,13 @@ fn compute_ctx_trend(records: &[StatsRecord], lookback: usize) -> Option<f64> {
     if records.len() < 2 {
         return None;
     }
-    let current = records.last()?.ctx_pct?;
+    let current = records.last()?.ctx_pct()?;
     let ago_idx = if records.len() > lookback {
         records.len() - lookback
     } else {
         0
     };
-    let past = records[ago_idx].ctx_pct?;
+    let past = records[ago_idx].ctx_pct()?;
     Some(current - past)
 }
 
@@ -373,8 +376,8 @@ pub fn print_summary(records: &[StatsRecord], days: u64) {
     let total_add: i64 = sessions.iter().map(|s| s.final_lines_add()).sum();
     let total_del: i64 = sessions.iter().map(|s| s.final_lines_del()).sum();
 
-    let total_cache_read: u64 = records.iter().filter_map(|r| r.cache_read).sum();
-    let total_cache_write: u64 = records.iter().filter_map(|r| r.cache_write).sum();
+    let total_cache_read: u64 = records.iter().filter_map(|r| r.cache_read()).sum();
+    let total_cache_write: u64 = records.iter().filter_map(|r| r.cache_write()).sum();
     let cache_total = total_cache_read + total_cache_write;
     let cache_pct = if cache_total > 0 {
         total_cache_read as f64 / cache_total as f64 * 100.0
@@ -540,24 +543,41 @@ pub fn clear_stats(yes: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::{ContextWindow, CurrentUsage, Model, Workspace};
 
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
         StatsRecord {
             v: STATS_VERSION,
             ts,
-            session_id: None,
-            model: Some("Opus 4.6".into()),
-            ctx_pct: Some(30.0),
-            in_tok: Some(1000),
-            out_tok: Some(500),
-            cost: Some(cost),
-            lines_add: Some(10),
-            lines_del: Some(5),
-            api_ms: Some(120_000),
-            wall_ms: Some(600_000),
-            project: Some(project.into()),
-            cache_read: Some(800),
-            cache_write: Some(200),
+            input: Input {
+                session_id: None,
+                model: Some(Model {
+                    display_name: Some("Opus 4.6".into()),
+                }),
+                context_window: Some(ContextWindow {
+                    used_percentage: Some(30.0),
+                    total_input_tokens: Some(1000),
+                    total_output_tokens: Some(500),
+                    current_usage: Some(CurrentUsage {
+                        cache_read_input_tokens: Some(800),
+                        cache_creation_input_tokens: Some(200),
+                    }),
+                }),
+                cost: Some(crate::input::Cost {
+                    total_cost_usd: Some(cost),
+                    total_lines_added: Some(10),
+                    total_lines_removed: Some(5),
+                    total_api_duration_ms: Some(120_000),
+                    total_duration_ms: Some(600_000),
+                }),
+                cwd: None,
+                version: None,
+                exceeds_200k_tokens: None,
+                output_style: None,
+                workspace: Some(Workspace {
+                    project_dir: Some(project.into()),
+                }),
+            },
         }
     }
 
@@ -567,8 +587,8 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let r2: StatsRecord = serde_json::from_str(&json).unwrap();
         assert_eq!(r2.ts, 1710500000);
-        assert_eq!(r2.cost, Some(4.11));
-        assert_eq!(r2.project, Some("/proj".into()));
+        assert_eq!(r2.cost(), Some(4.11));
+        assert_eq!(r2.project(), Some("/proj"));
     }
 
     #[test]
@@ -635,11 +655,11 @@ mod tests {
     #[test]
     fn detect_sessions_by_session_id() {
         let mut r1 = record(1000, 1.0, "/proj");
-        r1.session_id = Some("aaa".into());
+        r1.input.session_id = Some("aaa".into());
         let mut r2 = record(1100, 2.0, "/proj");
-        r2.session_id = Some("aaa".into());
+        r2.input.session_id = Some("aaa".into());
         let mut r3 = record(1200, 3.0, "/proj");
-        r3.session_id = Some("bbb".into());
+        r3.input.session_id = Some("bbb".into());
         let records = [r1, r2, r3];
         let sessions = detect_sessions(&records);
         assert_eq!(sessions.len(), 2);
@@ -650,11 +670,11 @@ mod tests {
     #[test]
     fn detect_sessions_mixed_session_id() {
         let mut r1 = record(1000, 1.0, "/proj");
-        r1.session_id = Some("aaa".into());
+        r1.input.session_id = Some("aaa".into());
         let mut r2 = record(1100, 2.0, "/proj");
-        r2.session_id = None;
+        r2.input.session_id = None;
         let mut r3 = record(1200, 3.0, "/proj");
-        r3.session_id = Some("aaa".into());
+        r3.input.session_id = Some("aaa".into());
         let records = [r1, r2, r3];
         let sessions = detect_sessions(&records);
         assert_eq!(sessions.len(), 3);
@@ -738,7 +758,7 @@ mod tests {
         let mut records = Vec::new();
         for i in 0..12 {
             let mut r = record(1000 + i * 100, 1.0, "/proj");
-            r.ctx_pct = Some(20.0 + i as f64 * 2.0);
+            r.input.context_window.as_mut().unwrap().used_percentage = Some(20.0 + i as f64 * 2.0);
             records.push(r);
         }
         // last = index 11 = 42.0, ago = index 2 = 24.0, delta = 18.0
@@ -766,19 +786,35 @@ mod tests {
         let r = StatsRecord {
             v: STATS_VERSION,
             ts: now,
-            session_id: Some("test-session".into()),
-            model: Some("Opus 4.6".into()),
-            ctx_pct: Some(30.0),
-            in_tok: Some(3931),
-            out_tok: Some(28564),
-            cost: Some(4.11),
-            lines_add: Some(438),
-            lines_del: Some(265),
-            api_ms: Some(1_019_272),
-            wall_ms: Some(6_887_404),
-            project: Some("/Users/demo/Git/my-project".into()),
-            cache_read: Some(58984),
-            cache_write: Some(1505),
+            input: Input {
+                session_id: Some("test-session".into()),
+                model: Some(Model {
+                    display_name: Some("Opus 4.6".into()),
+                }),
+                context_window: Some(ContextWindow {
+                    used_percentage: Some(30.0),
+                    total_input_tokens: Some(3931),
+                    total_output_tokens: Some(28564),
+                    current_usage: Some(CurrentUsage {
+                        cache_read_input_tokens: Some(58984),
+                        cache_creation_input_tokens: Some(1505),
+                    }),
+                }),
+                cost: Some(crate::input::Cost {
+                    total_cost_usd: Some(4.11),
+                    total_lines_added: Some(438),
+                    total_lines_removed: Some(265),
+                    total_api_duration_ms: Some(1_019_272),
+                    total_duration_ms: Some(6_887_404),
+                }),
+                cwd: Some("/Users/demo/Git/my-project".into()),
+                version: Some("2.1.69".into()),
+                exceeds_200k_tokens: None,
+                output_style: None,
+                workspace: Some(Workspace {
+                    project_dir: Some("/Users/demo/Git/my-project".into()),
+                }),
+            },
         };
 
         let line = serde_json::to_string(&r).unwrap();
@@ -786,8 +822,8 @@ mod tests {
 
         let content = fs::read_to_string(&path).unwrap();
         let parsed: StatsRecord = serde_json::from_str(content.trim()).unwrap();
-        assert_eq!(parsed.model, Some("Opus 4.6".into()));
-        assert_eq!(parsed.cost, Some(4.11));
+        assert_eq!(parsed.model_name(), Some("Opus 4.6"));
+        assert_eq!(parsed.cost(), Some(4.11));
     }
 
     #[test]
@@ -796,7 +832,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let good = format!(r#"{{"ts":{},"cost":1.0}}"#, now);
+        let good = format!(r#"{{"ts":{},"cost":{{"total_cost_usd":1.0}}}}"#, now);
         let lines = format!("not valid json\n{good}\n{{truncated\n");
 
         let mut records = Vec::new();
@@ -806,7 +842,7 @@ mod tests {
             }
         }
         assert_eq!(records.len(), 1);
-        assert_eq!(records[0].cost, Some(1.0));
+        assert_eq!(records[0].cost(), Some(1.0));
     }
 
     #[test]

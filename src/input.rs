@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Input {
     pub session_id: Option<String>,
     pub model: Option<Model>,
@@ -23,12 +23,12 @@ impl Input {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Model {
     pub display_name: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ContextWindow {
     pub used_percentage: Option<f64>,
     pub total_input_tokens: Option<u64>,
@@ -36,13 +36,13 @@ pub struct ContextWindow {
     pub current_usage: Option<CurrentUsage>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CurrentUsage {
     pub cache_creation_input_tokens: Option<u64>,
     pub cache_read_input_tokens: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Cost {
     pub total_cost_usd: Option<f64>,
     pub total_lines_added: Option<i64>,
@@ -51,12 +51,12 @@ pub struct Cost {
     pub total_duration_ms: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OutputStyle {
     pub name: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Workspace {
     pub project_dir: Option<String>,
 }

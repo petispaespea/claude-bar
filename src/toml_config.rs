@@ -77,7 +77,7 @@ pub struct StatsConfig {
 
 impl Default for StatsConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self { enabled: false }
     }
 }
 
@@ -281,6 +281,7 @@ pub fn default_config_toml() -> String {
 # Empty style \"\" means the element controls its own color dynamically.
 ";
     let mut config = BarConfig::default();
+    config.stats.enabled = true;
     let core = crate::config::CORE_ELEMENT_NAMES;
     let mut elements: Vec<String> = core[..core.len() - 1]
         .iter().map(|s| s.to_string()).collect();

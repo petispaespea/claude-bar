@@ -32,8 +32,8 @@ fn main() {
         return;
     }
 
-    if cli.list {
-        config::print_list();
+    if cli.info {
+        config::print_info();
         return;
     }
 

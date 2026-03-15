@@ -31,7 +31,7 @@ pub struct Icons {
 
 pub const MODEL_ICONS: Icons       = Icons { none: "",     oct: "\u{f4be} ", fa: "\u{ee0d} " };
 pub const VERSION_ICONS: Icons     = Icons { none: "",     oct: "\u{f412} ", fa: "\u{f02b} " };
-pub const CONTEXT_ICONS: Icons     = Icons { none: "",     oct: "\u{f463} ", fa: "\u{eeb2} " };
+pub const CONTEXT_ICONS: Icons     = Icons { none: "",     oct: "\u{f4ed} ", fa: "\u{eeb2} " };
 pub const TOKENS_ICONS: Icons      = Icons { none: "",     oct: "\u{f4df} ", fa: "\u{f292} " };
 pub const CACHE_ICONS: Icons       = Icons { none: "",     oct: "\u{f49b} ", fa: "\u{f1c0} " };
 pub const COST_ICONS: Icons        = Icons { none: "",     oct: "\u{f439} ", fa: "\u{f09d} " };
@@ -87,12 +87,12 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements (model, version, context/ctx/gauge, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert)"
+        help = "Comma-separated elements (model, version, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert)"
     )]
     pub elements: Option<String>,
 
-    #[arg(long, help = "List available elements and presets")]
-    pub list: bool,
+    #[arg(long, help = "Show available elements, presets, and bar styles")]
+    pub info: bool,
 
     #[arg(long, help = "Hide Nerd Font icons")]
     pub no_icons: bool,
@@ -157,7 +157,7 @@ fn parse_element(s: &str) -> Option<Element> {
     match s.trim() {
         "model" => Some(Element::Model),
         "version" => Some(Element::Version),
-        "gauge" | "context" | "ctx" => Some(Element::Context),
+        "context" | "ctx" => Some(Element::Context),
         "tokens" => Some(Element::Tokens),
         "cache" => Some(Element::Cache),
         "cost" => Some(Element::Cost),
@@ -235,7 +235,7 @@ pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
     mode
 }
 
-pub fn print_list() {
+pub fn print_info() {
     eprint!(
         "\
 PRESETS
@@ -248,7 +248,6 @@ ELEMENTS
   model          Model display name (e.g. Opus 4.6)
   version        Claude Code version
   context, ctx   Context usage bar + percentage (configurable)
-    gauge        Alias for context
   tokens         Input/output token counts
   cache          Cache read/write token counts
   cost           Session cost in USD
@@ -301,13 +300,12 @@ mod tests {
 
     #[test]
     fn test_parse_elements_aliases() {
-        let result = parse_elements("ctx,time,project_dir,output_style,gauge");
-        assert_eq!(result.len(), 5);
+        let result = parse_elements("ctx,time,project_dir,output_style");
+        assert_eq!(result.len(), 4);
         assert_eq!(result[0], Element::Context);
         assert_eq!(result[1], Element::Duration);
         assert_eq!(result[2], Element::ProjectDir);
         assert_eq!(result[3], Element::OutputStyle);
-        assert_eq!(result[4], Element::Context);
     }
 
     #[test]
@@ -407,7 +405,7 @@ mod tests {
         let cli = Cli {
             preset: Some("minimal".into()),
             elements: Some("model,cost".into()),
-            list: false,
+            info: false,
             no_icons: false,
             icon_set: None,
             demo: false,
@@ -427,7 +425,7 @@ mod tests {
         let cli = Cli {
             preset: Some("compact".into()),
             elements: None,
-            list: false,
+            info: false,
             no_icons: false,
             icon_set: None,
             demo: false,
@@ -447,7 +445,7 @@ mod tests {
         let cli = Cli {
             preset: None,
             elements: None,
-            list: false,
+            info: false,
             no_icons: true,
             icon_set: None,
             demo: false,
@@ -464,7 +462,7 @@ mod tests {
         let cli = Cli {
             preset: None,
             elements: None,
-            list: false,
+            info: false,
             no_icons: false,
             icon_set: Some("fa".into()),
             demo: false,
@@ -481,7 +479,7 @@ mod tests {
         let cli = Cli {
             preset: None,
             elements: None,
-            list: false,
+            info: false,
             no_icons: false,
             icon_set: None,
             demo: false,

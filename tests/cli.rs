@@ -93,9 +93,9 @@ fn demo_custom_elements_matches_baseline() {
 }
 
 #[test]
-fn list_prints_to_stderr() {
+fn info_prints_to_stderr() {
     let output = cmd()
-        .arg("--list")
+        .arg("--info")
         .output()
         .unwrap();
 

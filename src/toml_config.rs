@@ -281,8 +281,11 @@ pub fn default_config_toml() -> String {
 # Empty style \"\" means the element controls its own color dynamically.
 ";
     let mut config = BarConfig::default();
-    let mut elements: Vec<String> = crate::config::CORE_ELEMENT_NAMES
+    let core = crate::config::CORE_ELEMENT_NAMES;
+    let mut elements: Vec<String> = core[..core.len() - 1]
         .iter().map(|s| s.to_string()).collect();
+    elements.push(crate::config::LINE_BREAK.to_string());
+    elements.push(core[core.len() - 1].to_string());
     elements.push(crate::config::LINE_BREAK.to_string());
     elements.extend(crate::config::STATS_ELEMENT_NAMES.iter().map(|s| s.to_string()));
     config.layout.elements = elements;

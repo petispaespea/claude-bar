@@ -1,41 +1,39 @@
-//! ANSI style parsing for config system
+use std::borrow::Cow;
 
-/// Parse a space-separated style string into ANSI escape codes.
-///
-/// Supports 8 colors (black, red, green, yellow, blue, magenta, cyan, white)
-/// and 4 modifiers (bold, dim, italic, underline).
-/// Unknown tokens are silently ignored. Empty string returns empty string.
-pub fn parse_style(style_str: &str) -> String {
-    let mut result = String::new();
-
-    for token in style_str.split_whitespace() {
-        match token {
-            // Foreground colors
-            "black" => result.push_str("\x1b[30m"),
-            "red" => result.push_str("\x1b[31m"),
-            "green" => result.push_str("\x1b[32m"),
-            "yellow" => result.push_str("\x1b[33m"),
-            "blue" => result.push_str("\x1b[34m"),
-            "magenta" => result.push_str("\x1b[35m"),
-            "cyan" => result.push_str("\x1b[36m"),
-            "white" => result.push_str("\x1b[37m"),
-            // Modifiers
-            "bold" => result.push_str("\x1b[1m"),
-            "dim" => result.push_str("\x1b[2m"),
-            "italic" => result.push_str("\x1b[3m"),
-            "underline" => result.push_str("\x1b[4m"),
-            // Unknown tokens are silently ignored
-            _ => {}
-        }
+fn single_style(token: &str) -> Option<&'static str> {
+    match token {
+        "black" => Some("\x1b[30m"),
+        "red" => Some("\x1b[31m"),
+        "green" => Some("\x1b[32m"),
+        "yellow" => Some("\x1b[33m"),
+        "blue" => Some("\x1b[34m"),
+        "magenta" => Some("\x1b[35m"),
+        "cyan" => Some("\x1b[36m"),
+        "white" => Some("\x1b[37m"),
+        "bold" => Some("\x1b[1m"),
+        "dim" => Some("\x1b[2m"),
+        "italic" => Some("\x1b[3m"),
+        "underline" => Some("\x1b[4m"),
+        _ => None,
     }
-
-    result
 }
 
-/// Apply a style string to content, wrapping with ANSI codes and reset.
-///
-/// If style_str is empty, returns content unchanged (no ANSI wrapping).
-/// Otherwise, wraps content with the parsed style codes and adds reset code.
+pub fn parse_style(style_str: &str) -> Cow<'static, str> {
+    if style_str.is_empty() {
+        return Cow::Borrowed("");
+    }
+    if let Some(code) = single_style(style_str) {
+        return Cow::Borrowed(code);
+    }
+    let mut result = String::new();
+    for token in style_str.split_whitespace() {
+        if let Some(code) = single_style(token) {
+            result.push_str(code);
+        }
+    }
+    Cow::Owned(result)
+}
+
 pub fn apply_style(content: &str, style_str: &str) -> String {
     if style_str.is_empty() {
         content.to_string()
@@ -103,7 +101,6 @@ mod tests {
 
     #[test]
     fn matches_render_constants() {
-        // From render.rs:10-17
         const CYAN: &str = "\x1b[36m";
         const GREEN: &str = "\x1b[32m";
         const YELLOW: &str = "\x1b[33m";
@@ -115,5 +112,19 @@ mod tests {
         assert_eq!(parse_style("yellow"), YELLOW);
         assert_eq!(parse_style("red"), RED);
         assert_eq!(parse_style("dim"), DIM);
+    }
+
+    #[test]
+    fn single_tokens_are_borrowed() {
+        assert!(matches!(parse_style(""), Cow::Borrowed(_)));
+        assert!(matches!(parse_style("dim"), Cow::Borrowed(_)));
+        assert!(matches!(parse_style("cyan"), Cow::Borrowed(_)));
+        assert!(matches!(parse_style("bold"), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn compound_styles_are_owned() {
+        assert!(matches!(parse_style("bold cyan"), Cow::Owned(_)));
+        assert!(matches!(parse_style("red dim"), Cow::Owned(_)));
     }
 }

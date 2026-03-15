@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Input {
@@ -11,6 +12,8 @@ pub struct Input {
     pub exceeds_200k_tokens: Option<bool>,
     pub output_style: Option<OutputStyle>,
     pub workspace: Option<Workspace>,
+    #[serde(flatten, default)]
+    pub extra: Map<String, Value>,
 }
 
 impl Input {
@@ -119,6 +122,7 @@ pub fn demo() -> Input {
         workspace: Some(Workspace {
             project_dir: Some("/Users/demo/Git/my-project".into()),
         }),
+        extra: Default::default(),
     }
 }
 
@@ -252,5 +256,19 @@ mod tests {
         let usage = ctx.current_usage.unwrap();
         assert_eq!(usage.cache_read_input_tokens, Some(1000));
         assert!(usage.cache_creation_input_tokens.is_none());
+    }
+
+    #[test]
+    fn unknown_fields_preserved_through_roundtrip() {
+        let json_str = r#"{
+            "version": "2.1.69",
+            "future_field": "hello",
+            "future_object": { "nested": true }
+        }"#;
+        let input: Input = serde_json::from_str(json_str).unwrap();
+        let out = serde_json::to_string(&input).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["future_field"], "hello");
+        assert_eq!(v["future_object"]["nested"], true);
     }
 }

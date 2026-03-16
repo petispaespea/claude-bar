@@ -30,20 +30,20 @@ module_config!(ModelConfig,       MODEL_ICONS,    "cyan");
 module_config!(VersionConfig,     VERSION_ICONS,  "dim");
 module_config!(TokensConfig,      TOKENS_ICONS,   "dim");
 module_config!(CacheConfig,       CACHE_ICONS,    "dim");
-module_config!(CostConfig,        COST_ICONS,     "dim");
+module_config!(CostConfig,        COST_ICONS,     "green");
 module_config!(LinesConfig,       LINES_ICONS,    "");
-module_config!(DurationConfig,    DURATION_ICONS,  "dim");
-module_config!(WallTimeConfig,    WALL_TIME_ICONS, "dim");
-module_config!(CwdConfig,         CWD_ICONS,      "dim");
-module_config!(ProjectDirConfig,  PROJECT_ICONS,   "dim");
+module_config!(DurationConfig,    DURATION_ICONS,  "magenta");
+module_config!(WallTimeConfig,    WALL_TIME_ICONS, "magenta");
+module_config!(CwdConfig,         CWD_ICONS,      "blue");
+module_config!(ProjectDirConfig,  PROJECT_ICONS,   "blue");
 module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
-module_config!(DailyCostConfig,   COST_ICONS,       "");
-module_config!(BurnRateConfig,    DURATION_ICONS,   "dim");
-module_config!(SpendRateConfig,   DURATION_ICONS,   "dim");
+module_config!(DailyCostConfig,   COST_ICONS,      "green");
+module_config!(BurnRateConfig,    DURATION_ICONS,   "dim magenta");
+module_config!(SpendRateConfig,   DURATION_ICONS,   "dim magenta");
 module_config!(SessionCountConfig, SESSION_CT_ICONS, "dim");
-module_config!(TokPerDollarConfig, TOKENS_ICONS,     "dim");
+module_config!(TokPerDollarConfig, TOKENS_ICONS,     "dim green");
 module_config!(CacheHitRateConfig, CACHE_ICONS,      "dim");
-module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim");
+module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim green");
 module_config!(CtxTrendConfig,     CONTEXT_ICONS,    "");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -379,25 +379,29 @@ unknown_config = 123
         let config = BarConfig::default();
         assert_eq!(config.context.style, "");
         assert_eq!(config.lines.style, "");
+        assert_eq!(config.ctx_trend.style, "");
     }
 
     #[test]
-    fn test_dim_modules_have_correct_style() {
+    fn test_semantic_styles() {
         let config = BarConfig::default();
+        assert_eq!(config.model.style, "cyan");
         assert_eq!(config.version.style, "dim");
         assert_eq!(config.tokens.style, "dim");
         assert_eq!(config.cache.style, "dim");
-        assert_eq!(config.cost.style, "dim");
-        assert_eq!(config.duration.style, "dim");
-        assert_eq!(config.cwd.style, "dim");
-        assert_eq!(config.project.style, "dim");
+        assert_eq!(config.cost.style, "green");
+        assert_eq!(config.duration.style, "magenta");
+        assert_eq!(config.wall_time.style, "magenta");
+        assert_eq!(config.cwd.style, "blue");
+        assert_eq!(config.project.style, "blue");
         assert_eq!(config.style.style, "dim");
-    }
-
-    #[test]
-    fn test_model_is_cyan_only_colored_element() {
-        let config = BarConfig::default();
-        assert_eq!(config.model.style, "cyan");
+        assert_eq!(config.daily_cost.style, "green");
+        assert_eq!(config.burn_rate.style, "dim magenta");
+        assert_eq!(config.spend_rate.style, "dim magenta");
+        assert_eq!(config.tok_per_dollar.style, "dim green");
+        assert_eq!(config.cost_vs_avg.style, "dim green");
+        assert_eq!(config.session_count.style, "dim");
+        assert_eq!(config.cache_hit_rate.style, "dim");
     }
 
     #[test]

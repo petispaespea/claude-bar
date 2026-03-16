@@ -11,6 +11,7 @@ pub enum Element {
     Lines,
     Duration,
     WallTime,
+    GitBranch,
     Cwd,
     ProjectDir,
     OutputStyle,
@@ -48,6 +49,7 @@ pub const COST_ICONS: Icons        = Icons { none: "",     oct: "\u{f439} ", fa:
 pub const LINES_ICONS: Icons       = Icons { none: "",     oct: "\u{f4d2} ", fa: "\u{f05f} " };
 pub const DURATION_ICONS: Icons    = Icons { none: "api:", oct: "\u{f4e3} ", fa: "\u{f254} " };
 pub const WALL_TIME_ICONS: Icons   = Icons { none: "wall:", oct: "\u{f4e3} ", fa: "\u{f254} " };
+pub const GIT_BRANCH_ICONS: Icons  = Icons { none: "",      oct: "\u{f418} ", fa: "\u{f126} " };
 pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa: "\u{f114} " };
 pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
 pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
@@ -65,6 +67,7 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::Lines,
     Element::Duration,
     Element::WallTime,
+    Element::GitBranch,
     Element::Cwd,
     Element::ProjectDir,
     Element::OutputStyle,
@@ -82,7 +85,7 @@ const ALL_ELEMENTS: &[Element] = &[
 
 pub const CORE_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
-    "cost", "lines", "duration", "wall_time", "cwd", "project", "style", "alert",
+    "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
 ];
 
 pub const STATS_ELEMENT_NAMES: &[&str] = &[
@@ -92,7 +95,7 @@ pub const STATS_ELEMENT_NAMES: &[&str] = &[
 
 pub const ALL_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
-    "cost", "lines", "duration", "wall_time", "cwd", "project", "style", "alert",
+    "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
     "daily_cost", "burn_rate", "spend_rate", "session_count",
     "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
 ];
@@ -130,7 +133,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
+        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
     )]
     pub elements: Option<String>,
 
@@ -201,6 +204,7 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
             Element::Context,
             Element::Tokens,
             Element::Duration,
+            Element::GitBranch,
             Element::Cwd,
             Element::ProjectDir,
             Element::OutputStyle,
@@ -213,8 +217,9 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
                 Element::Lines,
             ],
             vec![
-                Element::Duration, Element::WallTime, Element::Cwd,
-                Element::ProjectDir, Element::OutputStyle, Element::Alert,
+                Element::Duration, Element::WallTime, Element::GitBranch,
+                Element::Cwd, Element::ProjectDir, Element::OutputStyle,
+                Element::Alert,
             ],
             vec![
                 Element::DailyCost, Element::BurnRate, Element::SpendRate,
@@ -237,6 +242,7 @@ fn parse_element(s: &str) -> Option<Element> {
         "lines" => Some(Element::Lines),
         "duration" | "time" => Some(Element::Duration),
         "wall_time" | "wall" | "elapsed" => Some(Element::WallTime),
+        "git_branch" | "branch" | "git" => Some(Element::GitBranch),
         "cwd" => Some(Element::Cwd),
         "project" | "project_dir" => Some(Element::ProjectDir),
         "style" | "output_style" => Some(Element::OutputStyle),
@@ -339,7 +345,7 @@ pub fn print_info() {
 PRESETS
   minimal        model, context, alert
   compact        model, context, cost, cwd, alert
-  default        model, context, tokens, duration, cwd, project, style, alert
+  default        model, context, tokens, duration, git_branch, cwd, project, style, alert
   full           all elements (3 lines)
 
 ELEMENTS
@@ -353,6 +359,8 @@ ELEMENTS
   duration, time API wait time
   wall_time,     Wall clock (elapsed) time
     wall, elapsed
+  git_branch,    Git branch name (reads .git/HEAD)
+    branch, git
   cwd            Current working directory (shortened)
   project,       Project root directory (shortened)
     project_dir
@@ -517,11 +525,12 @@ mod tests {
         let lines = preset_elements("default").unwrap();
         assert_eq!(lines.len(), 1);
         let elements = &lines[0];
-        assert_eq!(elements.len(), 8);
+        assert_eq!(elements.len(), 9);
         assert!(elements.contains(&Element::Model));
         assert!(elements.contains(&Element::Context));
         assert!(elements.contains(&Element::Tokens));
         assert!(elements.contains(&Element::Duration));
+        assert!(elements.contains(&Element::GitBranch));
         assert!(elements.contains(&Element::Cwd));
         assert!(elements.contains(&Element::ProjectDir));
         assert!(elements.contains(&Element::OutputStyle));
@@ -533,7 +542,7 @@ mod tests {
         let lines = preset_elements("full").unwrap();
         assert_eq!(lines.len(), 3);
         let all: Vec<Element> = lines.into_iter().flatten().collect();
-        assert_eq!(all.len(), 22);
+        assert_eq!(all.len(), 23);
         for elem in ALL_ELEMENTS.iter() {
             assert!(all.contains(elem));
         }

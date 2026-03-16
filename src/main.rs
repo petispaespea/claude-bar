@@ -1,5 +1,6 @@
 mod config;
 mod format;
+mod git;
 mod input;
 mod render;
 mod setup;

@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{
     debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, COST_VS_AVG_ICONS, CWD_ICONS,
-    DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, SESSION_CT_ICONS, STYLE_ICONS,
-    TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
+    DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, SESSION_CT_ICONS,
+    STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
 
 macro_rules! module_config {
@@ -34,6 +34,7 @@ module_config!(CostConfig,        COST_ICONS,     "green");
 module_config!(LinesConfig,       LINES_ICONS,    "");
 module_config!(DurationConfig,    DURATION_ICONS,  "magenta");
 module_config!(WallTimeConfig,    WALL_TIME_ICONS, "magenta");
+module_config!(GitBranchConfig,   GIT_BRANCH_ICONS, "magenta");
 module_config!(CwdConfig,         CWD_ICONS,      "blue");
 module_config!(ProjectDirConfig,  PROJECT_ICONS,   "blue");
 module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
@@ -139,6 +140,7 @@ pub struct BarConfig {
     pub lines: LinesConfig,
     pub duration: DurationConfig,
     pub wall_time: WallTimeConfig,
+    pub git_branch: GitBranchConfig,
     pub cwd: CwdConfig,
     pub project: ProjectDirConfig,
     pub style: OutputStyleConfig,
@@ -170,6 +172,7 @@ impl Default for BarConfig {
             lines: Default::default(),
             duration: Default::default(),
             wall_time: Default::default(),
+            git_branch: Default::default(),
             cwd: Default::default(),
             project: Default::default(),
             style: Default::default(),
@@ -211,7 +214,7 @@ impl Default for LayoutConfig {
         Self {
             elements: [
                 "model", "version", "context", "tokens", "cache",
-                "cost", "lines", "duration", "wall_time", "cwd", "project", "style", "alert",
+                "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -353,7 +356,7 @@ unknown_config = 123
         let config = BarConfig::default();
         let expected = vec![
             "model", "version", "context", "tokens", "cache", "cost", "lines", "duration",
-            "wall_time", "cwd", "project", "style", "alert",
+            "wall_time", "git_branch", "cwd", "project", "style", "alert",
         ];
         assert_eq!(config.layout.elements, expected);
     }

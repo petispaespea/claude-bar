@@ -67,6 +67,10 @@ impl Session<'_> {
     session_final!(final_lines_add, lines_add, i64, 0);
     session_final!(final_lines_del, lines_del, i64, 0);
 
+    pub fn session_id(&self) -> Option<&str> {
+        self.records.iter().rev().find_map(|r| r.session_id())
+    }
+
     pub fn model(&self) -> Option<&str> {
         self.records.iter().rev().find_map(|r| r.model_name())
     }
@@ -264,8 +268,19 @@ fn cost_per_hour(cost: Option<f64>, ms: Option<u64>, min_ms: u64) -> Option<f64>
     }
 }
 
+fn current_session_index(sessions: &[Session], current_session_id: Option<&str>) -> Option<usize> {
+    if let Some(sid) = current_session_id {
+        sessions.iter().position(|s| s.session_id() == Some(sid))
+    } else if !sessions.is_empty() {
+        Some(sessions.len() - 1)
+    } else {
+        None
+    }
+}
+
 pub fn compute_today_stats(
     today_records: &[StatsRecord],
+    current_session_id: Option<&str>,
     current_cost: Option<f64>,
     current_api_ms: Option<u64>,
     current_wall_ms: Option<u64>,
@@ -275,16 +290,17 @@ pub fn compute_today_stats(
     let ctx_trend = compute_ctx_trend(today_records, 10);
     let sessions = detect_sessions(today_records);
     let session_count = sessions.len();
+    let cur_idx = current_session_index(&sessions, current_session_id);
 
-    let completed_cost: f64 = if sessions.len() > 1 {
-        sessions[..sessions.len() - 1]
-            .iter()
-            .map(|s| s.final_cost())
-            .sum()
-    } else {
-        0.0
-    };
-    let daily_cost = completed_cost + current_cost.unwrap_or(0.0);
+    let mut other_cost = 0.0_f64;
+    let mut other_count = 0_usize;
+    for (i, s) in sessions.iter().enumerate() {
+        if Some(i) != cur_idx {
+            other_cost += s.final_cost();
+            other_count += 1;
+        }
+    }
+    let daily_cost = other_cost + current_cost.unwrap_or(0.0);
 
     let burn_rate = cost_per_hour(current_cost, current_api_ms, 60_000);
 
@@ -295,10 +311,8 @@ pub fn compute_today_stats(
         _ => None,
     };
 
-    let cost_vs_avg = if sessions.len() >= 2 {
-        let past_sessions = &sessions[..sessions.len() - 1];
-        let avg: f64 =
-            past_sessions.iter().map(|s| s.final_cost()).sum::<f64>() / past_sessions.len() as f64;
+    let cost_vs_avg = if other_count > 0 {
+        let avg = other_cost / other_count as f64;
         if avg > 0.001 {
             Some(current_cost.unwrap_or(0.0) / avg)
         } else {
@@ -635,7 +649,7 @@ mod tests {
             record(1200, 0.5, "/proj"),
             record(1300, 1.5, "/proj"),
         ];
-        let stats = compute_today_stats(&records, Some(1.5), Some(120_000), None, Some(500), None);
+        let stats = compute_today_stats(&records, None, Some(1.5), Some(120_000), None, Some(500), None);
         assert!((stats.daily_cost - 3.5).abs() < 0.01);
         assert_eq!(stats.session_count, 2);
     }
@@ -643,42 +657,42 @@ mod tests {
     #[test]
     fn burn_rate_under_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(1.0), Some(30_000), None, Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(1.0), Some(30_000), None, Some(100), None);
         assert!(stats.burn_rate.is_none());
     }
 
     #[test]
     fn burn_rate_over_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(6.0), Some(3_600_000), None, Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None);
         assert!((stats.burn_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn spend_rate_under_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(1.0), Some(60_000), Some(200_000), Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None);
         assert!(stats.spend_rate.is_none());
     }
 
     #[test]
     fn spend_rate_over_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None);
         assert!((stats.spend_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn tok_per_dollar_zero_cost() {
         let records = vec![record(1000, 0.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(0.0), Some(60_000), None, Some(1000), None);
+        let stats = compute_today_stats(&records, None, Some(0.0), Some(60_000), None, Some(1000), None);
         assert!(stats.tok_per_dollar.is_none());
     }
 
     #[test]
     fn cost_vs_avg_single_session() {
         let records = vec![record(1000, 5.0, "/proj")];
-        let stats = compute_today_stats(&records, Some(5.0), Some(60_000), None, Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(5.0), Some(60_000), None, Some(100), None);
         assert!(stats.cost_vs_avg.is_none());
     }
 
@@ -686,8 +700,34 @@ mod tests {
     fn daily_budget_pct() {
         let records = vec![record(1000, 50.0, "/proj")];
         let stats =
-            compute_today_stats(&records, Some(50.0), Some(60_000), None, Some(100), Some(100.0));
+            compute_today_stats(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0));
         assert!((stats.daily_budget_pct.unwrap() - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn daily_cost_multi_project() {
+        // Session A: started earlier in /foo, still running, cost $5
+        // Session B: started later in /bar, completed, cost $2
+        // Current invocation is from session A (cost $5)
+        // Expected daily_cost = $5 + $2 = $7
+        let mut r1 = record(1000, 0.5, "/foo");
+        r1.input.session_id = Some("aaa".into());
+        let mut r2 = record(2000, 1.0, "/bar");
+        r2.input.session_id = Some("bbb".into());
+        let mut r3 = record(2500, 2.0, "/bar");
+        r3.input.session_id = Some("bbb".into());
+        let mut r4 = record(3000, 5.0, "/foo");
+        r4.input.session_id = Some("aaa".into());
+
+        let records = vec![r1, r2, r3, r4];
+        // current_cost = $5 (from session A's live stdin)
+        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None);
+        // Should be $5 (session A) + $2 (session B) = $7
+        assert!(
+            (stats.daily_cost - 7.0).abs() < 0.01,
+            "daily_cost was {} but expected 7.0",
+            stats.daily_cost
+        );
     }
 
     #[test]

@@ -91,6 +91,7 @@ fn main() {
         };
         Some(stats::compute_today_stats(
             &today,
+            input.session_id.as_deref(),
             current_cost,
             current_api_ms,
             current_wall_ms,

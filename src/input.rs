@@ -45,6 +45,9 @@ impl Input {
     pub fn api_ms(&self) -> Option<u64> {
         self.cost.as_ref()?.total_api_duration_ms
     }
+    pub fn wall_ms(&self) -> Option<u64> {
+        self.cost.as_ref()?.total_duration_ms
+    }
     pub fn lines_add(&self) -> Option<i64> {
         self.cost.as_ref()?.total_lines_added
     }

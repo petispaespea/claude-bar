@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::{
     debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, COST_VS_AVG_ICONS, CWD_ICONS,
     DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, SESSION_CT_ICONS, STYLE_ICONS,
-    TOKENS_ICONS, VERSION_ICONS,
+    TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
 
 macro_rules! module_config {
@@ -33,6 +33,7 @@ module_config!(CacheConfig,       CACHE_ICONS,    "dim");
 module_config!(CostConfig,        COST_ICONS,     "dim");
 module_config!(LinesConfig,       LINES_ICONS,    "");
 module_config!(DurationConfig,    DURATION_ICONS,  "dim");
+module_config!(WallTimeConfig,    WALL_TIME_ICONS, "dim");
 module_config!(CwdConfig,         CWD_ICONS,      "dim");
 module_config!(ProjectDirConfig,  PROJECT_ICONS,   "dim");
 module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
@@ -137,6 +138,7 @@ pub struct BarConfig {
     pub cost: CostConfig,
     pub lines: LinesConfig,
     pub duration: DurationConfig,
+    pub wall_time: WallTimeConfig,
     pub cwd: CwdConfig,
     pub project: ProjectDirConfig,
     pub style: OutputStyleConfig,
@@ -167,6 +169,7 @@ impl Default for BarConfig {
             cost: Default::default(),
             lines: Default::default(),
             duration: Default::default(),
+            wall_time: Default::default(),
             cwd: Default::default(),
             project: Default::default(),
             style: Default::default(),
@@ -208,7 +211,7 @@ impl Default for LayoutConfig {
         Self {
             elements: [
                 "model", "version", "context", "tokens", "cache",
-                "cost", "lines", "duration", "cwd", "project", "style", "alert",
+                "cost", "lines", "duration", "wall_time", "cwd", "project", "style", "alert",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -349,7 +352,7 @@ unknown_config = 123
         let config = BarConfig::default();
         let expected = vec![
             "model", "version", "context", "tokens", "cache", "cost", "lines", "duration",
-            "cwd", "project", "style", "alert",
+            "wall_time", "cwd", "project", "style", "alert",
         ];
         assert_eq!(config.layout.elements, expected);
     }

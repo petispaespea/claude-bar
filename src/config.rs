@@ -10,6 +10,7 @@ pub enum Element {
     Cost,
     Lines,
     Duration,
+    WallTime,
     Cwd,
     ProjectDir,
     OutputStyle,
@@ -46,6 +47,7 @@ pub const CACHE_ICONS: Icons       = Icons { none: "",     oct: "\u{f49b} ", fa:
 pub const COST_ICONS: Icons        = Icons { none: "",     oct: "\u{f439} ", fa: "\u{f09d} " };
 pub const LINES_ICONS: Icons       = Icons { none: "",     oct: "\u{f4d2} ", fa: "\u{f05f} " };
 pub const DURATION_ICONS: Icons    = Icons { none: "api:", oct: "\u{f4e3} ", fa: "\u{f254} " };
+pub const WALL_TIME_ICONS: Icons   = Icons { none: "wall:", oct: "\u{f4e3} ", fa: "\u{f254} " };
 pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa: "\u{f114} " };
 pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
 pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
@@ -62,6 +64,7 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::Cost,
     Element::Lines,
     Element::Duration,
+    Element::WallTime,
     Element::Cwd,
     Element::ProjectDir,
     Element::OutputStyle,
@@ -79,7 +82,7 @@ const ALL_ELEMENTS: &[Element] = &[
 
 pub const CORE_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
-    "cost", "lines", "duration", "cwd", "project", "style", "alert",
+    "cost", "lines", "duration", "wall_time", "cwd", "project", "style", "alert",
 ];
 
 pub const STATS_ELEMENT_NAMES: &[&str] = &[
@@ -89,7 +92,7 @@ pub const STATS_ELEMENT_NAMES: &[&str] = &[
 
 pub const ALL_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
-    "cost", "lines", "duration", "cwd", "project", "style", "alert",
+    "cost", "lines", "duration", "wall_time", "cwd", "project", "style", "alert",
     "daily_cost", "burn_rate", "spend_rate", "session_count",
     "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
 ];
@@ -127,7 +130,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
+        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
     )]
     pub elements: Option<String>,
 
@@ -218,6 +221,7 @@ fn parse_element(s: &str) -> Option<Element> {
         "cost" => Some(Element::Cost),
         "lines" => Some(Element::Lines),
         "duration" | "time" => Some(Element::Duration),
+        "wall_time" | "wall" | "elapsed" => Some(Element::WallTime),
         "cwd" => Some(Element::Cwd),
         "project" | "project_dir" => Some(Element::ProjectDir),
         "style" | "output_style" => Some(Element::OutputStyle),
@@ -332,6 +336,8 @@ ELEMENTS
   cost           Session cost in USD
   lines          Lines added/removed this session
   duration, time API wait time
+  wall_time,     Wall clock (elapsed) time
+    wall, elapsed
   cwd            Current working directory (shortened)
   project,       Project root directory (shortened)
     project_dir
@@ -512,7 +518,7 @@ mod tests {
         let result = preset_elements("full");
         assert!(result.is_some());
         let elements = result.unwrap();
-        assert_eq!(elements.len(), 21);
+        assert_eq!(elements.len(), 22);
         for elem in ALL_ELEMENTS.iter() {
             assert!(elements.contains(elem));
         }

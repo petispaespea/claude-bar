@@ -1,7 +1,7 @@
 use crate::config::{
     Element, IconMode, Icons, ALERT_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
     COST_VS_AVG_ICONS, CWD_ICONS, DURATION_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS,
-    SESSION_CT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS,
+    SESSION_CT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
 use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::input::Input;
@@ -230,6 +230,12 @@ fn render_duration(input: &Input, mode: IconMode, config: &BarConfig) -> Option<
         &DURATION_ICONS, Some(format_duration(ms)))
 }
 
+fn render_wall_time(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let ms = input.wall_ms()?;
+    render_element(&config.wall_time.symbol, &config.wall_time.style, mode,
+        &WALL_TIME_ICONS, Some(format_duration(ms)))
+}
+
 fn render_cwd(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
     let p = input.cwd.as_ref()?;
     render_element(&config.cwd.symbol, &config.cwd.style, mode,
@@ -388,6 +394,7 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::Cost => render_cost(input, mode, config),
         Element::Lines => render_lines(input, mode, config),
         Element::Duration => render_duration(input, mode, config),
+        Element::WallTime => render_wall_time(input, mode, config),
         Element::Cwd => render_cwd(input, mode, config),
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),

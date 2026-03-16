@@ -164,7 +164,7 @@ pub struct Cli {
     pub config: Option<std::path::PathBuf>,
 
     #[arg(long, help = "Print default TOML config to stdout")]
-    pub print_default_config: bool,
+    pub print_config: bool,
 
     #[arg(long, help = "Show usage statistics")]
     pub stats: bool,
@@ -186,17 +186,17 @@ pub fn build_cli() -> clap::Command {
     Cli::command()
 }
 
-pub(crate) fn preset_elements(name: &str) -> Option<Vec<Element>> {
+pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
     Some(match name {
-        "minimal" => vec![Element::Model, Element::Context, Element::Alert],
-        "compact" => vec![
+        "minimal" => vec![vec![Element::Model, Element::Context, Element::Alert]],
+        "compact" => vec![vec![
             Element::Model,
             Element::Context,
             Element::Cost,
             Element::Cwd,
             Element::Alert,
-        ],
-        "default" => vec![
+        ]],
+        "default" => vec![vec![
             Element::Model,
             Element::Context,
             Element::Tokens,
@@ -205,8 +205,23 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Element>> {
             Element::ProjectDir,
             Element::OutputStyle,
             Element::Alert,
+        ]],
+        "full" => vec![
+            vec![
+                Element::Model, Element::Version, Element::Context,
+                Element::Tokens, Element::Cache, Element::Cost,
+                Element::Lines,
+            ],
+            vec![
+                Element::Duration, Element::WallTime, Element::Cwd,
+                Element::ProjectDir, Element::OutputStyle, Element::Alert,
+            ],
+            vec![
+                Element::DailyCost, Element::BurnRate, Element::SpendRate,
+                Element::SessionCount, Element::DailyBudget, Element::TokPerDollar,
+                Element::CacheHitRate, Element::CostVsAvg, Element::CtxTrend,
+            ],
         ],
-        "full" => ALL_ELEMENTS.to_vec(),
         _ => return None,
     })
 }
@@ -275,10 +290,10 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
     }
     if let Some(ref name) = cli.preset {
         debug(&format!("elements: using --preset {name}"));
-        return vec![preset_elements(name).unwrap_or_else(|| {
+        return preset_elements(name).unwrap_or_else(|| {
             eprintln!("Unknown preset: {name}. Use --info to see available presets.");
             std::process::exit(1);
-        })];
+        });
     }
     if let Some(val) = env("CLAUDE_BAR") {
         if val.contains(',') {
@@ -287,7 +302,7 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
         }
         if let Some(elems) = preset_elements(&val) {
             debug(&format!("elements: using $CLAUDE_BAR preset {val}"));
-            return vec![elems];
+            return elems;
         }
     }
     if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
@@ -295,7 +310,7 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
         return split_into_lines(layout.iter().map(|s| s.as_str()));
     }
     debug("elements: using built-in default preset");
-    vec![preset_elements("default").unwrap()]
+    preset_elements("default").unwrap()
 }
 
 pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
@@ -325,7 +340,7 @@ PRESETS
   minimal        model, context, alert
   compact        model, context, cost, cwd, alert
   default        model, context, tokens, duration, cwd, project, style, alert
-  full           all elements
+  full           all elements (3 lines)
 
 ELEMENTS
   model          Model display name (e.g. Opus 4.6)
@@ -392,7 +407,7 @@ mod tests {
             demo: false,
             setup: false,
             completions: None,
-            print_default_config: false,
+            print_config: false,
             config: None,
             stats: false,
             stats_days: 7,
@@ -475,9 +490,9 @@ mod tests {
 
     #[test]
     fn test_preset_elements_minimal() {
-        let result = preset_elements("minimal");
-        assert!(result.is_some());
-        let elements = result.unwrap();
+        let lines = preset_elements("minimal").unwrap();
+        assert_eq!(lines.len(), 1);
+        let elements = &lines[0];
         assert_eq!(elements.len(), 3);
         assert_eq!(elements[0], Element::Model);
         assert_eq!(elements[1], Element::Context);
@@ -486,9 +501,9 @@ mod tests {
 
     #[test]
     fn test_preset_elements_compact() {
-        let result = preset_elements("compact");
-        assert!(result.is_some());
-        let elements = result.unwrap();
+        let lines = preset_elements("compact").unwrap();
+        assert_eq!(lines.len(), 1);
+        let elements = &lines[0];
         assert_eq!(elements.len(), 5);
         assert!(elements.contains(&Element::Model));
         assert!(elements.contains(&Element::Context));
@@ -499,9 +514,9 @@ mod tests {
 
     #[test]
     fn test_preset_elements_default() {
-        let result = preset_elements("default");
-        assert!(result.is_some());
-        let elements = result.unwrap();
+        let lines = preset_elements("default").unwrap();
+        assert_eq!(lines.len(), 1);
+        let elements = &lines[0];
         assert_eq!(elements.len(), 8);
         assert!(elements.contains(&Element::Model));
         assert!(elements.contains(&Element::Context));
@@ -515,12 +530,12 @@ mod tests {
 
     #[test]
     fn test_preset_elements_full() {
-        let result = preset_elements("full");
-        assert!(result.is_some());
-        let elements = result.unwrap();
-        assert_eq!(elements.len(), 22);
+        let lines = preset_elements("full").unwrap();
+        assert_eq!(lines.len(), 3);
+        let all: Vec<Element> = lines.into_iter().flatten().collect();
+        assert_eq!(all.len(), 22);
         for elem in ALL_ELEMENTS.iter() {
-            assert!(elements.contains(elem));
+            assert!(all.contains(elem));
         }
     }
 
@@ -551,12 +566,12 @@ mod tests {
 
     #[test]
     fn test_preset_elements_full_includes_stats() {
-        let result = preset_elements("full").unwrap();
-        assert!(result.contains(&Element::DailyCost));
-        assert!(result.contains(&Element::BurnRate));
-        assert!(result.contains(&Element::SpendRate));
-        assert!(result.contains(&Element::CacheHitRate));
-        assert!(result.contains(&Element::CtxTrend));
+        let all: Vec<Element> = preset_elements("full").unwrap().into_iter().flatten().collect();
+        assert!(all.contains(&Element::DailyCost));
+        assert!(all.contains(&Element::BurnRate));
+        assert!(all.contains(&Element::SpendRate));
+        assert!(all.contains(&Element::CacheHitRate));
+        assert!(all.contains(&Element::CtxTrend));
     }
 
     #[test]

@@ -273,7 +273,7 @@ pub fn load_config(cli_path: Option<&str>) -> Option<BarConfig> {
     }
 }
 
-pub fn default_config_toml() -> String {
+pub fn config_toml() -> String {
     let header = "\
 # claude-bar configuration
 # Place at ~/.config/claude-bar.toml or set $CLAUDE_BAR_CONFIG.
@@ -285,13 +285,14 @@ pub fn default_config_toml() -> String {
 ";
     let mut config = BarConfig::default();
     config.stats.enabled = true;
+    let brk = crate::config::LINE_BREAK.to_string();
     let core = crate::config::CORE_ELEMENT_NAMES;
-    let mut elements: Vec<String> = core[..core.len() - 1]
-        .iter().map(|s| s.to_string()).collect();
-    elements.push(crate::config::LINE_BREAK.to_string());
-    elements.push(core[core.len() - 1].to_string());
-    elements.push(crate::config::LINE_BREAK.to_string());
-    elements.extend(crate::config::STATS_ELEMENT_NAMES.iter().map(|s| s.to_string()));
+    let elements = core[..7].iter().map(|s| s.to_string())
+        .chain(std::iter::once(brk.clone()))
+        .chain(core[7..].iter().map(|s| s.to_string()))
+        .chain(std::iter::once(brk))
+        .chain(crate::config::STATS_ELEMENT_NAMES.iter().map(|s| s.to_string()))
+        .collect();
     config.layout.elements = elements;
     let body = toml::to_string_pretty(&config).unwrap();
     format!("{header}\n{body}")

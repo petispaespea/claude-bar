@@ -181,7 +181,7 @@ fn config_layout_hides_multiple_elements() {
 #[test]
 fn config_print_default_roundtrip() {
     let default_config = cmd()
-        .arg("--print-default-config")
+        .arg("--print-config")
         .output()
         .unwrap();
 

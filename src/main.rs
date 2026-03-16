@@ -38,8 +38,8 @@ fn main() {
         return;
     }
 
-    if cli.print_default_config {
-        print!("{}", toml_config::default_config_toml());
+    if cli.print_config {
+        print!("{}", toml_config::config_toml());
         return;
     }
 

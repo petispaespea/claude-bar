@@ -330,7 +330,7 @@ fn render_spend_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_s
 fn render_session_count(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
     let count = today_stats.as_ref()?.session_count;
     render_element(&config.session_count.symbol, &config.session_count.style, mode,
-        &SESSION_CT_ICONS, Some(format!("#{count} today")))
+        &SESSION_CT_ICONS, Some(format!("#{count}")))
 }
 
 fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {

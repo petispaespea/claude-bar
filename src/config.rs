@@ -372,7 +372,7 @@ STATS ELEMENTS (require [stats] enabled = true)
   project_daily_cost  Today's spend for current project (alias: daily_cost)
   burn_rate      Cost per hour (API duration)
   spend_rate     Cost per hour (wall clock)
-  session_count  Number of sessions today
+  session_count  Number of sessions for current project
   daily_budget   Daily spend limit with progress bar
   tok_per_dollar Output tokens per dollar
   cost_vs_avg    Current session cost vs historical average

@@ -265,7 +265,10 @@ pub fn compute_today_stats(
 ) -> TodayStats {
     let ctx_trend = compute_ctx_trend(today_records, 10);
     let sessions = group_sessions(today_records);
-    let session_count = sessions.len();
+    let matches_project = |s: &Session| -> bool {
+        current_project.is_some_and(|cp| s.project() == Some(cp))
+    };
+    let session_count = sessions.iter().filter(|s| matches_project(s)).count();
     let cur_idx = current_session_index(&sessions, current_session_id);
 
     let mut other_cost = 0.0_f64;
@@ -273,9 +276,6 @@ pub fn compute_today_stats(
     let mut project_delta = 0.0_f64;
     let mut other_count = 0_usize;
     let mut cur_first_cost = 0.0_f64;
-    let matches_project = |s: &Session| -> bool {
-        current_project.is_some_and(|cp| s.project() == Some(cp))
-    };
     let cur_matches_project = cur_idx.is_some_and(|i| matches_project(&sessions[i]));
 
     for (i, s) in sessions.iter().enumerate() {

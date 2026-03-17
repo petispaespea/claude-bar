@@ -99,6 +99,7 @@ fn main() {
             current_out_tok,
             budget_limit,
             current_project,
+            config.ctx_trend.lookback_secs,
         ))
     } else {
         None

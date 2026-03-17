@@ -45,7 +45,24 @@ module_config!(SessionCountConfig, SESSION_CT_ICONS, "dim");
 module_config!(TokPerDollarConfig, TOKENS_ICONS,     "dim green");
 module_config!(CacheHitRateConfig, CACHE_ICONS,      "dim");
 module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim green");
-module_config!(CtxTrendConfig,     CONTEXT_ICONS,    "");
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct CtxTrendConfig {
+    pub symbol: String,
+    pub style: String,
+    pub lookback_secs: u64,
+}
+
+impl Default for CtxTrendConfig {
+    fn default() -> Self {
+        Self {
+            symbol: CONTEXT_ICONS.oct.to_string(),
+            style: String::new(),
+            lookback_secs: 300,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]

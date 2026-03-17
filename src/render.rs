@@ -10,8 +10,7 @@ use crate::style::{apply_style, parse_style};
 use crate::toml_config::BarConfig;
 
 const BRAILLE: [char; 9] = [
-    '\u{2800}', '\u{2840}', '\u{2844}', '\u{2846}', '\u{2847}', '\u{28C7}', '\u{28E7}', '\u{28F7}',
-    '\u{28FF}',
+    '⠀', '⡀', '⡄', '⡆', '⡇', '⣇', '⣧', '⣷', '⣿',
 ];
 const SHADE: [char; 5] = [' ', '░', '▒', '▓', '█'];
 const GREEN: &str = "\x1b[32m";

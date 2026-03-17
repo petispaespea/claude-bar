@@ -268,8 +268,9 @@ pub fn compute_today_stats(
     current_out_tok: Option<u64>,
     budget_limit: Option<f64>,
     current_project: Option<&str>,
+    ctx_lookback_secs: u64,
 ) -> TodayStats {
-    let ctx_trend = compute_ctx_trend(today_records, 10);
+    let ctx_trend = compute_ctx_trend(today_records, ctx_lookback_secs);
     let sessions = group_sessions(today_records);
     let matches_project = |s: &Session| -> bool {
         current_project.is_some_and(|cp| s.project() == Some(cp))
@@ -343,18 +344,19 @@ pub fn compute_today_stats(
     }
 }
 
-fn compute_ctx_trend(records: &[StatsRecord], lookback: usize) -> Option<f64> {
+fn compute_ctx_trend(records: &[StatsRecord], lookback_secs: u64) -> Option<f64> {
     if records.len() < 2 {
         return None;
     }
-    let current = records.last()?.ctx_pct()?;
-    let ago_idx = if records.len() > lookback {
-        records.len() - lookback
-    } else {
-        0
-    };
-    let past = records[ago_idx].ctx_pct()?;
-    Some(current - past)
+    let current = records.last()?;
+    let current_pct = current.ctx_pct()?;
+    let cutoff = current.ts.saturating_sub(lookback_secs);
+    let idx = records.partition_point(|r| r.ts <= cutoff);
+    let past = records[..idx]
+        .iter()
+        .rev()
+        .find(|r| r.ctx_pct().is_some())?;
+    Some(current_pct - past.ctx_pct()?)
 }
 
 pub fn print_summary(records: &[StatsRecord], days: u64) {
@@ -536,6 +538,8 @@ pub fn clear_stats(yes: bool) {
 mod tests {
     use super::*;
 
+    const LOOKBACK: u64 = 300;
+
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
         record_with_session(ts, cost, project, "default")
     }
@@ -631,7 +635,7 @@ mod tests {
             record_with_session(1200, 0.5, "/proj", "bbb"),
             record_with_session(1300, 1.5, "/proj", "bbb"),
         ];
-        let stats = compute_today_stats(&records, Some("bbb"), Some(1.5), Some(120_000), None, Some(500), None, Some("/proj"));
+        let stats = compute_today_stats(&records, Some("bbb"), Some(1.5), Some(120_000), None, Some(500), None, Some("/proj"), LOOKBACK);
         // all_daily_cost: session aaa delta (2-1=1) + cur_delta (1.5-0.5=1) = 2.0
         assert!((stats.all_daily_cost - 2.0).abs() < 0.01);
         assert_eq!(stats.session_count, 2);
@@ -640,14 +644,14 @@ mod tests {
     #[test]
     fn burn_rate_under_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(1.0), Some(30_000), None, Some(100), None, Some("/proj"));
+        let stats = compute_today_stats(&records, None, Some(1.0), Some(30_000), None, Some(100), None, Some("/proj"), LOOKBACK);
         assert!(stats.burn_rate.is_none());
     }
 
     #[test]
     fn burn_rate_over_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None, Some("/proj"));
+        let stats = compute_today_stats(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None, Some("/proj"), LOOKBACK);
         assert!((stats.burn_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
@@ -704,6 +708,7 @@ mod tests {
             Some(1000),
             None,
             Some("/proj"),
+            LOOKBACK,
         )
     }
 
@@ -723,28 +728,28 @@ mod tests {
     #[test]
     fn spend_rate_under_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None, Some("/proj"));
+        let stats = compute_today_stats(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None, Some("/proj"), LOOKBACK);
         assert!(stats.spend_rate.is_none());
     }
 
     #[test]
     fn spend_rate_over_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None, Some("/proj"));
+        let stats = compute_today_stats(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None, Some("/proj"), LOOKBACK);
         assert!((stats.spend_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn tok_per_dollar_zero_cost() {
         let records = vec![record(1000, 0.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(0.0), Some(60_000), None, Some(1000), None, Some("/proj"));
+        let stats = compute_today_stats(&records, None, Some(0.0), Some(60_000), None, Some(1000), None, Some("/proj"), LOOKBACK);
         assert!(stats.tok_per_dollar.is_none());
     }
 
     #[test]
     fn cost_vs_avg_single_session() {
         let records = vec![record(1000, 5.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(5.0), Some(60_000), None, Some(100), None, Some("/proj"));
+        let stats = compute_today_stats(&records, None, Some(5.0), Some(60_000), None, Some(100), None, Some("/proj"), LOOKBACK);
         assert!(stats.cost_vs_avg.is_none());
     }
 
@@ -752,7 +757,7 @@ mod tests {
     fn daily_budget_pct() {
         let records = vec![record(1000, 10.0, "/proj"), record(2000, 50.0, "/proj")];
         let stats =
-            compute_today_stats(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0), Some("/proj"));
+            compute_today_stats(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0), Some("/proj"), LOOKBACK);
         // all_daily_cost = delta (50 - 10 = 40), budget = 100, pct = 40%
         assert!((stats.daily_budget_pct.unwrap() - 40.0).abs() < 0.01);
     }
@@ -765,7 +770,7 @@ mod tests {
             record_with_session(2500, 2.0, "/bar", "bbb"),
             record_with_session(3000, 5.0, "/foo", "aaa"),
         ];
-        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None, Some("/foo"));
+        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None, Some("/foo"), LOOKBACK);
         // project_daily_cost: only /foo sessions' delta = cur_delta = 5.0 - 0.5 = 4.5
         assert!(
             (stats.project_daily_cost - 4.5).abs() < 0.01,
@@ -786,7 +791,7 @@ mod tests {
             record_with_session(1000, 3.0, "/proj", "aaa"),
             record_with_session(2000, 5.0, "/proj", "aaa"),
         ];
-        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), None, None, None, Some(10.0), Some("/proj"));
+        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), None, None, None, Some(10.0), Some("/proj"), LOOKBACK);
         // all_daily_cost = today's delta only = $5 - $3 = $2
         assert!(
             (stats.all_daily_cost - 2.0).abs() < 0.01,
@@ -809,7 +814,7 @@ mod tests {
             record_with_session(1050, 0.5, "/bar", "bbb"),
             record_with_session(1150, 2.5, "/bar", "bbb"),
         ];
-        let stats = compute_today_stats(&records, Some("aaa"), Some(3.0), None, None, None, None, Some("/bar"));
+        let stats = compute_today_stats(&records, Some("aaa"), Some(3.0), None, None, None, None, Some("/bar"), LOOKBACK);
         // project_daily_cost: only /bar sessions' delta = 2.5 - 0.5 = 2.0 (current session not in /bar)
         assert!(
             (stats.project_daily_cost - 2.0).abs() < 0.01,
@@ -826,25 +831,28 @@ mod tests {
 
     #[test]
     fn ctx_trend_not_enough_data() {
-        let trend = compute_ctx_trend(&[], 10);
+        let trend = compute_ctx_trend(&[], LOOKBACK);
         assert!(trend.is_none());
 
         let records = vec![record(1000, 1.0, "/proj")];
-        let trend = compute_ctx_trend(&records, 10);
+        let trend = compute_ctx_trend(&records, LOOKBACK);
         assert!(trend.is_none());
     }
 
     #[test]
     fn ctx_trend_simple_delta() {
         let mut records = Vec::new();
+        // 12 records, 60 seconds apart (total span = 11 * 60 = 660s)
         for i in 0..12 {
-            let mut r = record(1000 + i * 100, 1.0, "/proj");
+            let mut r = record(1000 + i * 60, 1.0, "/proj");
             r.input.context_window.as_mut().unwrap().used_percentage = Some(20.0 + i as f64 * 2.0);
             records.push(r);
         }
-        // last = index 11 = 42.0, ago = index 2 = 24.0, delta = 18.0
-        let trend = compute_ctx_trend(&records, 10).unwrap();
-        assert!((trend - 18.0).abs() < 0.01);
+        // lookback 300s: last record at ts=1660, cutoff=1360
+        // first record with ts <= 1360 (scanning backwards) is ts=1360 (i=6), ctx_pct=32.0
+        // last record: i=11, ctx_pct=42.0, delta = 42.0 - 32.0 = 10.0
+        let trend = compute_ctx_trend(&records, LOOKBACK).unwrap();
+        assert!((trend - 10.0).abs() < 0.01);
     }
 
     #[test]

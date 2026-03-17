@@ -645,6 +645,75 @@ mod tests {
         assert!((stats.burn_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
+    /// When current session ID doesn't match any loaded record, cur_first_cost
+    /// falls back to 0, making cur_delta = current_cost (the full cumulative cost).
+    /// The current session's records are also counted as a completed session.
+    /// This double-counts the current session's spend.
+    #[test]
+    fn project_daily_cost_session_id_mismatch() {
+        let (records, current_cost, expected_daily) = cumulative_session_fixture();
+        let stats = cumulative_session_stats(&records, "826-new", current_cost);
+
+        assert_daily_cost(&stats, expected_daily, current_cost);
+    }
+
+    /// Real-world scenario: long-running conversation reattached across multiple
+    /// session IDs. Costs are cumulative (monotonically increasing across segments).
+    #[test]
+    fn project_daily_cost_cumulative_sessions() {
+        let (records, current_cost, expected_daily) = cumulative_session_fixture();
+        let stats = cumulative_session_stats(&records, "826", current_cost);
+
+        assert_daily_cost(&stats, expected_daily, current_cost);
+    }
+
+    fn cumulative_session_fixture() -> (Vec<StatsRecord>, f64, f64) {
+        let records = vec![
+            record_with_session(1000, 160.80, "/proj", "e8d"),
+            record_with_session(2000, 174.45, "/proj", "e8d"),
+            record_with_session(3000, 174.45, "/proj", "55c"),
+            record_with_session(4000, 184.96, "/proj", "55c"),
+            record_with_session(5000, 184.96, "/proj", "91a"),
+            record_with_session(6000, 198.21, "/proj", "91a"),
+            record_with_session(7000, 198.21, "/proj", "826"),
+            record_with_session(8000, 199.37, "/proj", "826"),
+        ];
+        let current_cost = 199.37;
+        let expected_daily =
+            (174.45 - 160.80) + (184.96 - 174.45) + (198.21 - 184.96) + (199.37 - 198.21);
+        (records, current_cost, expected_daily)
+    }
+
+    fn cumulative_session_stats(
+        records: &[StatsRecord],
+        session_id: &str,
+        current_cost: f64,
+    ) -> TodayStats {
+        compute_today_stats(
+            records,
+            Some(session_id),
+            Some(current_cost),
+            Some(22_440_000),
+            Some(461_880_000),
+            Some(1000),
+            None,
+            Some("/proj"),
+        )
+    }
+
+    fn assert_daily_cost(stats: &TodayStats, expected: f64, ceiling: f64) {
+        assert!(
+            (stats.project_daily_cost - expected).abs() < 0.1,
+            "project_daily_cost was ${:.2} but expected ${:.2} (sum of deltas)",
+            stats.project_daily_cost, expected
+        );
+        assert!(
+            stats.project_daily_cost <= ceiling,
+            "project_daily_cost ${:.2} exceeds total session cost ${:.2}",
+            stats.project_daily_cost, ceiling
+        );
+    }
+
     #[test]
     fn spend_rate_under_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];

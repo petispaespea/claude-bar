@@ -101,6 +101,12 @@ fn main() {
             current_project,
             config.ctx_trend.lookback_secs,
         ))
+        .map(|mut s| {
+            if let Some(proj) = current_project {
+                s.avg_daily_cost = stats::compute_avg_daily_cost(proj, config.avg_daily_cost.lookback_days);
+            }
+            s
+        })
     } else {
         None
     };

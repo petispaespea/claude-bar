@@ -48,6 +48,24 @@ module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim green");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
+pub struct AvgDailyCostConfig {
+    pub symbol: String,
+    pub style: String,
+    pub lookback_days: u64,
+}
+
+impl Default for AvgDailyCostConfig {
+    fn default() -> Self {
+        Self {
+            symbol: COST_ICONS.oct.to_string(),
+            style: "dim green".to_string(),
+            lookback_days: 30,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct CtxTrendConfig {
     pub symbol: String,
     pub style: String,
@@ -171,6 +189,7 @@ pub struct BarConfig {
     pub tok_per_dollar: TokPerDollarConfig,
     pub cache_hit_rate: CacheHitRateConfig,
     pub cost_vs_avg: CostVsAvgConfig,
+    pub avg_daily_cost: AvgDailyCostConfig,
     pub ctx_trend: CtxTrendConfig,
     #[serde(rename = "alert")]
     pub alerts: Vec<AlertRule>,
@@ -203,6 +222,7 @@ impl Default for BarConfig {
             tok_per_dollar: Default::default(),
             cache_hit_rate: Default::default(),
             cost_vs_avg: Default::default(),
+            avg_daily_cost: Default::default(),
             ctx_trend: Default::default(),
             alerts: vec![
                 AlertRule {

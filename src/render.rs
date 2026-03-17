@@ -338,7 +338,7 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, today_stats: 
 fn render_project_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
     let stats = today_stats.as_ref()?;
     render_element(&config.project_daily_cost.symbol, &config.project_daily_cost.style, mode,
-        &COST_ICONS, Some(format!("${:.2}/day", stats.project_daily_cost)))
+        &COST_ICONS, Some(format!("${:.2} today", stats.project_daily_cost)))
 }
 
 fn render_burn_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
@@ -417,6 +417,12 @@ fn render_ctx_trend(_input: &Input, mode: IconMode, config: &BarConfig, today_st
     Some(styled_or_raw(content, &cfg.style))
 }
 
+fn render_avg_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+    let avg = today_stats.as_ref()?.avg_daily_cost?;
+    render_element(&config.avg_daily_cost.symbol, &config.avg_daily_cost.style, mode,
+        &COST_ICONS, Some(format!("${avg:.2}/day")))
+}
+
 pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
     match elem {
         Element::Model => render_model(input, mode, config),
@@ -442,5 +448,6 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::CacheHitRate => render_cache_hit_rate(input, mode, config),
         Element::CostVsAvg => render_cost_vs_avg(input, mode, config, today_stats),
         Element::CtxTrend => render_ctx_trend(input, mode, config, today_stats),
+        Element::AvgDailyCost => render_avg_daily_cost(input, mode, config, today_stats),
     }
 }

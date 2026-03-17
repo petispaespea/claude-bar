@@ -70,6 +70,10 @@ impl Session<'_> {
         self.records.first().and_then(|r| r.cost()).unwrap_or(0.0)
     }
 
+    pub fn cost_delta(&self) -> f64 {
+        self.final_cost() - self.first_cost()
+    }
+
     pub fn session_id(&self) -> Option<&str> {
         self.records.first().and_then(|r| r.session_id())
     }
@@ -240,6 +244,7 @@ pub struct TodayStats {
     pub cost_vs_avg: Option<f64>,
     pub ctx_trend: Option<f64>,
     pub daily_budget_pct: Option<f64>,
+    pub avg_daily_cost: Option<f64>,
 }
 
 fn cost_per_hour(cost: Option<f64>, ms: Option<u64>, min_ms: u64) -> Option<f64> {
@@ -288,7 +293,7 @@ pub fn compute_today_stats(
     for (i, s) in sessions.iter().enumerate() {
         if Some(i) != cur_idx {
             let fc = s.final_cost();
-            let delta = fc - s.first_cost();
+            let delta = s.cost_delta();
             other_cost += fc;
             all_delta += delta;
             if matches_project(s) {
@@ -341,6 +346,7 @@ pub fn compute_today_stats(
         cost_vs_avg,
         ctx_trend,
         daily_budget_pct,
+        avg_daily_cost: None,
     }
 }
 
@@ -357,6 +363,28 @@ fn compute_ctx_trend(records: &[StatsRecord], lookback_secs: u64) -> Option<f64>
         .rev()
         .find(|r| r.ctx_pct().is_some())?;
     Some(current_pct - past.ctx_pct()?)
+}
+
+pub fn compute_avg_daily_cost(project: &str, lookback_days: u64) -> Option<f64> {
+    let records = load_records(lookback_days, Some(project));
+    avg_daily_cost_from_records(&records)
+}
+
+pub fn avg_daily_cost_from_records(records: &[StatsRecord]) -> Option<f64> {
+    if records.is_empty() {
+        return None;
+    }
+    let sessions = group_sessions(records);
+    let mut by_day: HashMap<String, f64> = HashMap::new();
+    for s in &sessions {
+        let day = day_string(s.start_ts());
+        *by_day.entry(day).or_insert(0.0) += s.cost_delta();
+    }
+    if by_day.is_empty() {
+        return None;
+    }
+    let total: f64 = by_day.values().sum();
+    Some(total / by_day.len() as f64)
 }
 
 pub fn print_summary(records: &[StatsRecord], days: u64) {
@@ -928,8 +956,42 @@ mod tests {
             records: vec![&r1, &r2],
         };
         assert_eq!(s.final_cost(), 2.0);
+        assert_eq!(s.cost_delta(), 1.0);
         assert_eq!(s.start_ts(), 1000);
         assert_eq!(s.model(), Some("Opus 4.6"));
         assert_eq!(s.project(), Some("/proj"));
+    }
+
+    #[test]
+    fn avg_daily_cost_empty() {
+        assert!(avg_daily_cost_from_records(&[]).is_none());
+    }
+
+    #[test]
+    fn avg_daily_cost_single_day() {
+        let records = vec![
+            record_with_session(1000, 1.0, "/proj", "aaa"),
+            record_with_session(2000, 3.0, "/proj", "aaa"),
+            record_with_session(3000, 0.5, "/proj", "bbb"),
+            record_with_session(4000, 2.5, "/proj", "bbb"),
+        ];
+        // day: 1970-01-01, session aaa delta=2.0, session bbb delta=2.0, total=4.0, 1 day => avg=4.0
+        let avg = avg_daily_cost_from_records(&records).unwrap();
+        assert!((avg - 4.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn avg_daily_cost_multi_day() {
+        let day1 = 86400; // 1970-01-02
+        let day2 = 86400 * 2; // 1970-01-03
+        let records = vec![
+            record_with_session(day1, 1.0, "/proj", "aaa"),
+            record_with_session(day1 + 100, 3.0, "/proj", "aaa"),
+            record_with_session(day2, 0.5, "/proj", "bbb"),
+            record_with_session(day2 + 100, 1.5, "/proj", "bbb"),
+        ];
+        // day1: delta=2.0, day2: delta=1.0, avg = 1.5
+        let avg = avg_daily_cost_from_records(&records).unwrap();
+        assert!((avg - 1.5).abs() < 0.01);
     }
 }

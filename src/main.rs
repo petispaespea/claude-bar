@@ -79,7 +79,7 @@ fn main() {
     }
 
     let today_stats = if config.stats.enabled {
-        let today = stats::load_today_records();
+        let today = stats::load_today_records(&config.stats.day_window);
         let current_cost = input.cost.as_ref().and_then(|c| c.total_cost_usd);
         let current_api_ms = input.cost.as_ref().and_then(|c| c.total_api_duration_ms);
         let current_wall_ms = input.cost.as_ref().and_then(|c| c.total_duration_ms);

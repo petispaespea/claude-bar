@@ -75,11 +75,12 @@ impl Default for ContextConfig {
 #[serde(default)]
 pub struct StatsConfig {
     pub enabled: bool,
+    pub day_window: String,
 }
 
 impl Default for StatsConfig {
     fn default() -> Self {
-        Self { enabled: false }
+        Self { enabled: false, day_window: "calendar".to_string() }
     }
 }
 

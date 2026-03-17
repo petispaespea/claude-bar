@@ -205,8 +205,14 @@ fn load_from_file(
     }
 }
 
-pub fn load_today_records() -> Vec<StatsRecord> {
-    load_records(1, None)
+pub fn load_today_records(day_window: &str) -> Vec<StatsRecord> {
+    if day_window == "rolling" {
+        return load_records(1, None);
+    }
+    let path = stats_file_for_day(now_secs());
+    let mut records = Vec::new();
+    load_from_file(&path, 0, None, &mut records);
+    records
 }
 
 pub fn group_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {

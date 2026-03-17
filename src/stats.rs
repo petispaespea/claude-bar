@@ -200,10 +200,10 @@ fn load_from_file(
         if record.ts < cutoff {
             continue;
         }
-        if let Some(proj) = project {
-            if record.project() != Some(proj) {
-                continue;
-            }
+        if let Some(proj) = project
+            && record.project() != Some(proj)
+        {
+            continue;
         }
         records.push(record);
     }
@@ -538,7 +538,7 @@ fn time_from_epoch(secs: u64) -> (u64, u64, u64) {
 }
 
 fn is_leap(y: u64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
 pub fn clear_stats(yes: bool) {

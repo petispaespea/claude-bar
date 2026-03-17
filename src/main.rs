@@ -89,6 +89,7 @@ fn main() {
         } else {
             None
         };
+        let current_project = input.workspace.as_ref().and_then(|w| w.project_dir.as_deref());
         Some(stats::compute_today_stats(
             &today,
             input.session_id.as_deref(),
@@ -97,6 +98,7 @@ fn main() {
             current_wall_ms,
             current_out_tok,
             budget_limit,
+            current_project,
         ))
     } else {
         None

@@ -165,7 +165,7 @@ These require `[stats] enabled = true` in the TOML config:
 
 | Name            | Description                              |
 |-----------------|------------------------------------------|
-| `daily_cost`    | Sum of session costs today               |
+| `project_daily_cost` | Today's spend for current project (alias: `daily_cost`) |
 | `burn_rate`     | Cost per hour (API duration)             |
 | `spend_rate`    | Cost per hour (wall clock)               |
 | `session_count` | Number of sessions today                 |

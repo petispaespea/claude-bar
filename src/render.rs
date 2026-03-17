@@ -309,10 +309,10 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, today_stats: 
     }
 }
 
-fn render_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+fn render_project_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
     let stats = today_stats.as_ref()?;
-    render_element(&config.daily_cost.symbol, &config.daily_cost.style, mode,
-        &COST_ICONS, Some(format!("${:.2}/day", stats.daily_cost)))
+    render_element(&config.project_daily_cost.symbol, &config.project_daily_cost.style, mode,
+        &COST_ICONS, Some(format!("${:.2}/day", stats.project_daily_cost)))
 }
 
 fn render_burn_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
@@ -338,7 +338,7 @@ fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, today
     let pct = stats.daily_budget_pct?;
     let cfg = &config.daily_budget;
     let limit = cfg.limit;
-    let cost = stats.daily_cost;
+    let cost = stats.all_daily_cost;
 
     let i = icon(&cfg.symbol, mode, &COST_ICONS);
     let color = pct_color(pct);
@@ -407,7 +407,7 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),
         Element::Alert => render_alert(input, mode, config, today_stats),
-        Element::DailyCost => render_daily_cost(input, mode, config, today_stats),
+        Element::ProjectDailyCost => render_project_daily_cost(input, mode, config, today_stats),
         Element::BurnRate => render_burn_rate(input, mode, config, today_stats),
         Element::SpendRate => render_spend_rate(input, mode, config, today_stats),
         Element::SessionCount => render_session_count(input, mode, config, today_stats),

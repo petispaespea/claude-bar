@@ -16,7 +16,6 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
-const SESSION_GAP_SECS: u64 = 7200;
 const MS_PER_HOUR: f64 = 3_600_000.0;
 const SECS_PER_DAY: u64 = 86_400;
 
@@ -67,16 +66,20 @@ impl Session<'_> {
     session_final!(final_lines_add, lines_add, i64, 0);
     session_final!(final_lines_del, lines_del, i64, 0);
 
+    pub fn first_cost(&self) -> f64 {
+        self.records.first().and_then(|r| r.cost()).unwrap_or(0.0)
+    }
+
     pub fn session_id(&self) -> Option<&str> {
-        self.records.iter().rev().find_map(|r| r.session_id())
+        self.records.first().and_then(|r| r.session_id())
     }
 
     pub fn model(&self) -> Option<&str> {
-        self.records.iter().rev().find_map(|r| r.model_name())
+        self.records.first().and_then(|r| r.model_name())
     }
 
     pub fn project(&self) -> Option<&str> {
-        self.records.iter().rev().find_map(|r| r.project())
+        self.records.first().and_then(|r| r.project())
     }
 
     pub fn start_ts(&self) -> u64 {
@@ -206,52 +209,24 @@ pub fn load_today_records() -> Vec<StatsRecord> {
     load_records(1, None)
 }
 
-pub fn detect_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
-    let mut by_project: HashMap<&str, Vec<&'a StatsRecord>> = HashMap::new();
+pub fn group_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
+    let mut by_session: HashMap<(&str, &str), Vec<&'a StatsRecord>> = HashMap::new();
     for r in records {
-        let key = r.project().unwrap_or("");
-        by_project.entry(key).or_default().push(r);
+        let proj = r.project().unwrap_or("");
+        let sid = r.session_id().unwrap_or("");
+        by_session.entry((proj, sid)).or_default().push(r);
     }
 
-    let mut sessions = Vec::new();
-
-    for (_proj, recs) in by_project {
-        let mut current: Vec<&'a StatsRecord> = Vec::new();
-
-        for r in recs {
-            let is_boundary = if let Some(prev) = current.last() {
-                if r.session_id().is_some() || prev.session_id().is_some() {
-                    r.session_id() != prev.session_id()
-                } else {
-                    let cost_decreased =
-                        r.cost().unwrap_or(0.0) < prev.cost().unwrap_or(0.0) - 0.001;
-                    let gap = r.ts.saturating_sub(prev.ts) > SESSION_GAP_SECS;
-                    cost_decreased || gap
-                }
-            } else {
-                false
-            };
-
-            if is_boundary && !current.is_empty() {
-                sessions.push(Session {
-                    records: std::mem::take(&mut current),
-                });
-            }
-            current.push(r);
-        }
-
-        if !current.is_empty() {
-            sessions.push(Session { records: current });
-        }
-    }
-
-    sessions.sort_by_key(|s| s.start_ts());
-    sessions
+    by_session
+        .into_values()
+        .map(|records| Session { records })
+        .collect()
 }
 
 #[derive(Debug)]
 pub struct TodayStats {
-    pub daily_cost: f64,
+    pub project_daily_cost: f64,
+    pub all_daily_cost: f64,
     pub burn_rate: Option<f64>,
     pub spend_rate: Option<f64>,
     pub session_count: usize,
@@ -286,21 +261,40 @@ pub fn compute_today_stats(
     current_wall_ms: Option<u64>,
     current_out_tok: Option<u64>,
     budget_limit: Option<f64>,
+    current_project: Option<&str>,
 ) -> TodayStats {
     let ctx_trend = compute_ctx_trend(today_records, 10);
-    let sessions = detect_sessions(today_records);
+    let sessions = group_sessions(today_records);
     let session_count = sessions.len();
     let cur_idx = current_session_index(&sessions, current_session_id);
 
     let mut other_cost = 0.0_f64;
+    let mut all_delta = 0.0_f64;
+    let mut project_delta = 0.0_f64;
     let mut other_count = 0_usize;
+    let mut cur_first_cost = 0.0_f64;
+    let matches_project = |s: &Session| -> bool {
+        current_project.is_some_and(|cp| s.project() == Some(cp))
+    };
+    let cur_matches_project = cur_idx.is_some_and(|i| matches_project(&sessions[i]));
+
     for (i, s) in sessions.iter().enumerate() {
         if Some(i) != cur_idx {
-            other_cost += s.final_cost();
+            let fc = s.final_cost();
+            let delta = fc - s.first_cost();
+            other_cost += fc;
+            all_delta += delta;
+            if matches_project(s) {
+                project_delta += delta;
+            }
             other_count += 1;
+        } else {
+            cur_first_cost = s.first_cost();
         }
     }
-    let daily_cost = other_cost + current_cost.unwrap_or(0.0);
+    let cur_delta = (current_cost.unwrap_or(0.0) - cur_first_cost).max(0.0);
+    let all_daily_cost = all_delta + cur_delta;
+    let project_daily_cost = project_delta + if cur_matches_project { cur_delta } else { 0.0 };
 
     let burn_rate = cost_per_hour(current_cost, current_api_ms, 60_000);
 
@@ -324,14 +318,15 @@ pub fn compute_today_stats(
 
     let daily_budget_pct = budget_limit.map(|limit| {
         if limit > 0.0 {
-            daily_cost / limit * 100.0
+            all_daily_cost / limit * 100.0
         } else {
             0.0
         }
     });
 
     TodayStats {
-        daily_cost,
+        project_daily_cost,
+        all_daily_cost,
         burn_rate,
         spend_rate,
         session_count,
@@ -357,7 +352,8 @@ fn compute_ctx_trend(records: &[StatsRecord], lookback: usize) -> Option<f64> {
 }
 
 pub fn print_summary(records: &[StatsRecord], days: u64) {
-    let sessions = detect_sessions(records);
+    let mut sessions = group_sessions(records);
+    sessions.sort_by_key(|s| s.start_ts());
 
     let total_cost: f64 = sessions.iter().map(|s| s.final_cost()).sum();
     let total_api_ms: u64 = sessions.iter().map(|s| s.final_api_ms()).sum();
@@ -535,8 +531,12 @@ mod tests {
     use super::*;
 
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
+        record_with_session(ts, cost, project, "default")
+    }
+
+    fn record_with_session(ts: u64, cost: f64, project: &str, session_id: &str) -> StatsRecord {
         let mut input = crate::input::demo();
-        input.session_id = None;
+        input.session_id = Some(session_id.into());
         input.cost.as_mut().unwrap().total_cost_usd = Some(cost);
         input.workspace.as_mut().unwrap().project_dir = Some(project.into());
         StatsRecord { v: STATS_VERSION, ts, input }
@@ -559,174 +559,193 @@ mod tests {
     }
 
     #[test]
-    fn detect_sessions_single_session() {
+    fn group_sessions_single_session() {
         let records = vec![
             record(1000, 1.0, "/proj"),
             record(1100, 2.0, "/proj"),
             record(1200, 3.0, "/proj"),
         ];
-        let sessions = detect_sessions(&records);
+        let sessions = group_sessions(&records);
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].records.len(), 3);
     }
 
     #[test]
-    fn detect_sessions_cost_decrease_boundary() {
+    fn group_sessions_different_ids() {
         let records = vec![
-            record(1000, 1.0, "/proj"),
-            record(1100, 2.0, "/proj"),
-            record(1200, 0.5, "/proj"),
-            record(1300, 1.5, "/proj"),
+            record_with_session(1000, 1.0, "/proj", "aaa"),
+            record_with_session(1100, 2.0, "/proj", "aaa"),
+            record_with_session(1200, 0.5, "/proj", "bbb"),
+            record_with_session(1300, 1.5, "/proj", "bbb"),
         ];
-        let sessions = detect_sessions(&records);
+        let sessions = group_sessions(&records);
         assert_eq!(sessions.len(), 2);
-        assert_eq!(sessions[0].final_cost(), 2.0);
-        assert_eq!(sessions[1].final_cost(), 1.5);
+        let mut costs: Vec<f64> = sessions.iter().map(|s| s.final_cost()).collect();
+        costs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(costs, vec![1.5, 2.0]);
     }
 
     #[test]
-    fn detect_sessions_gap_boundary() {
-        let records = vec![
-            record(1000, 1.0, "/proj"),
-            record(1100, 2.0, "/proj"),
-            record(1100 + SESSION_GAP_SECS + 1, 3.0, "/proj"),
-        ];
-        let sessions = detect_sessions(&records);
-        assert_eq!(sessions.len(), 2);
-    }
-
-    #[test]
-    fn detect_sessions_interleaved_projects() {
+    fn group_sessions_interleaved_projects() {
         let records = vec![
             record(1000, 1.0, "/proj-a"),
             record(1050, 1.0, "/proj-b"),
             record(1100, 2.0, "/proj-a"),
             record(1150, 2.0, "/proj-b"),
         ];
-        let sessions = detect_sessions(&records);
+        let sessions = group_sessions(&records);
         assert_eq!(sessions.len(), 2);
     }
 
     #[test]
-    fn detect_sessions_empty() {
-        let sessions = detect_sessions(&[]);
+    fn group_sessions_empty() {
+        let sessions = group_sessions(&[]);
         assert!(sessions.is_empty());
     }
 
     #[test]
-    fn detect_sessions_by_session_id() {
-        let mut r1 = record(1000, 1.0, "/proj");
-        r1.input.session_id = Some("aaa".into());
-        let mut r2 = record(1100, 2.0, "/proj");
-        r2.input.session_id = Some("aaa".into());
-        let mut r3 = record(1200, 3.0, "/proj");
-        r3.input.session_id = Some("bbb".into());
-        let records = [r1, r2, r3];
-        let sessions = detect_sessions(&records);
+    fn group_sessions_same_project_different_ids() {
+        let records = vec![
+            record_with_session(1000, 1.0, "/proj", "aaa"),
+            record_with_session(1100, 2.0, "/proj", "aaa"),
+            record_with_session(1200, 3.0, "/proj", "bbb"),
+        ];
+        let sessions = group_sessions(&records);
         assert_eq!(sessions.len(), 2);
-        assert_eq!(sessions[0].records.len(), 2);
-        assert_eq!(sessions[1].records.len(), 1);
-    }
-
-    #[test]
-    fn detect_sessions_mixed_session_id() {
-        let mut r1 = record(1000, 1.0, "/proj");
-        r1.input.session_id = Some("aaa".into());
-        let mut r2 = record(1100, 2.0, "/proj");
-        r2.input.session_id = None;
-        let mut r3 = record(1200, 3.0, "/proj");
-        r3.input.session_id = Some("aaa".into());
-        let records = [r1, r2, r3];
-        let sessions = detect_sessions(&records);
-        assert_eq!(sessions.len(), 3);
+        let mut lens: Vec<usize> = sessions.iter().map(|s| s.records.len()).collect();
+        lens.sort();
+        assert_eq!(lens, vec![1, 2]);
     }
 
     #[test]
     fn compute_today_stats_basic() {
         let records = vec![
-            record(1000, 1.0, "/proj"),
-            record(1100, 2.0, "/proj"),
-            record(1200, 0.5, "/proj"),
-            record(1300, 1.5, "/proj"),
+            record_with_session(1000, 1.0, "/proj", "aaa"),
+            record_with_session(1100, 2.0, "/proj", "aaa"),
+            record_with_session(1200, 0.5, "/proj", "bbb"),
+            record_with_session(1300, 1.5, "/proj", "bbb"),
         ];
-        let stats = compute_today_stats(&records, None, Some(1.5), Some(120_000), None, Some(500), None);
-        assert!((stats.daily_cost - 3.5).abs() < 0.01);
+        let stats = compute_today_stats(&records, Some("bbb"), Some(1.5), Some(120_000), None, Some(500), None, Some("/proj"));
+        // all_daily_cost: session aaa delta (2-1=1) + cur_delta (1.5-0.5=1) = 2.0
+        assert!((stats.all_daily_cost - 2.0).abs() < 0.01);
         assert_eq!(stats.session_count, 2);
     }
 
     #[test]
     fn burn_rate_under_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(1.0), Some(30_000), None, Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(1.0), Some(30_000), None, Some(100), None, Some("/proj"));
         assert!(stats.burn_rate.is_none());
     }
 
     #[test]
     fn burn_rate_over_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None, Some("/proj"));
         assert!((stats.burn_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn spend_rate_under_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None, Some("/proj"));
         assert!(stats.spend_rate.is_none());
     }
 
     #[test]
     fn spend_rate_over_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None, Some("/proj"));
         assert!((stats.spend_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn tok_per_dollar_zero_cost() {
         let records = vec![record(1000, 0.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(0.0), Some(60_000), None, Some(1000), None);
+        let stats = compute_today_stats(&records, None, Some(0.0), Some(60_000), None, Some(1000), None, Some("/proj"));
         assert!(stats.tok_per_dollar.is_none());
     }
 
     #[test]
     fn cost_vs_avg_single_session() {
         let records = vec![record(1000, 5.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(5.0), Some(60_000), None, Some(100), None);
+        let stats = compute_today_stats(&records, None, Some(5.0), Some(60_000), None, Some(100), None, Some("/proj"));
         assert!(stats.cost_vs_avg.is_none());
     }
 
     #[test]
     fn daily_budget_pct() {
-        let records = vec![record(1000, 50.0, "/proj")];
+        let records = vec![record(1000, 10.0, "/proj"), record(2000, 50.0, "/proj")];
         let stats =
-            compute_today_stats(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0));
-        assert!((stats.daily_budget_pct.unwrap() - 50.0).abs() < 0.01);
+            compute_today_stats(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0), Some("/proj"));
+        // all_daily_cost = delta (50 - 10 = 40), budget = 100, pct = 40%
+        assert!((stats.daily_budget_pct.unwrap() - 40.0).abs() < 0.01);
     }
 
     #[test]
     fn daily_cost_multi_project() {
-        // Session A: started earlier in /foo, still running, cost $5
-        // Session B: started later in /bar, completed, cost $2
-        // Current invocation is from session A (cost $5)
-        // Expected daily_cost = $5 + $2 = $7
-        let mut r1 = record(1000, 0.5, "/foo");
-        r1.input.session_id = Some("aaa".into());
-        let mut r2 = record(2000, 1.0, "/bar");
-        r2.input.session_id = Some("bbb".into());
-        let mut r3 = record(2500, 2.0, "/bar");
-        r3.input.session_id = Some("bbb".into());
-        let mut r4 = record(3000, 5.0, "/foo");
-        r4.input.session_id = Some("aaa".into());
-
-        let records = vec![r1, r2, r3, r4];
-        // current_cost = $5 (from session A's live stdin)
-        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None);
-        // Should be $5 (session A) + $2 (session B) = $7
+        let records = vec![
+            record_with_session(1000, 0.5, "/foo", "aaa"),
+            record_with_session(2000, 1.0, "/bar", "bbb"),
+            record_with_session(2500, 2.0, "/bar", "bbb"),
+            record_with_session(3000, 5.0, "/foo", "aaa"),
+        ];
+        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None, Some("/foo"));
+        // project_daily_cost: only /foo sessions' delta = cur_delta = 5.0 - 0.5 = 4.5
         assert!(
-            (stats.daily_cost - 7.0).abs() < 0.01,
-            "daily_cost was {} but expected 7.0",
-            stats.daily_cost
+            (stats.project_daily_cost - 4.5).abs() < 0.01,
+            "project_daily_cost was {} but expected 4.5",
+            stats.project_daily_cost
+        );
+        // all_daily_cost: /bar delta (2.0 - 1.0 = 1.0) + cur_delta (4.5) = 5.5
+        assert!(
+            (stats.all_daily_cost - 5.5).abs() < 0.01,
+            "all_daily_cost was {} but expected 5.5",
+            stats.all_daily_cost
+        );
+    }
+
+    #[test]
+    fn all_daily_cost_spanning_session() {
+        let records = vec![
+            record_with_session(1000, 3.0, "/proj", "aaa"),
+            record_with_session(2000, 5.0, "/proj", "aaa"),
+        ];
+        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), None, None, None, Some(10.0), Some("/proj"));
+        // all_daily_cost = today's delta only = $5 - $3 = $2
+        assert!(
+            (stats.all_daily_cost - 2.0).abs() < 0.01,
+            "all_daily_cost was {} but expected 2.0",
+            stats.all_daily_cost
+        );
+        // daily_budget_pct should use all_daily_cost: $2 / $10 = 20%
+        assert!(
+            (stats.daily_budget_pct.unwrap() - 20.0).abs() < 0.01,
+            "daily_budget_pct was {} but expected 20.0",
+            stats.daily_budget_pct.unwrap()
+        );
+    }
+
+    #[test]
+    fn project_daily_cost_filters_by_project() {
+        let records = vec![
+            record_with_session(1000, 1.0, "/foo", "aaa"),
+            record_with_session(1100, 3.0, "/foo", "aaa"),
+            record_with_session(1050, 0.5, "/bar", "bbb"),
+            record_with_session(1150, 2.5, "/bar", "bbb"),
+        ];
+        let stats = compute_today_stats(&records, Some("aaa"), Some(3.0), None, None, None, None, Some("/bar"));
+        // project_daily_cost: only /bar sessions' delta = 2.5 - 0.5 = 2.0 (current session not in /bar)
+        assert!(
+            (stats.project_daily_cost - 2.0).abs() < 0.01,
+            "project_daily_cost was {} but expected 2.0",
+            stats.project_daily_cost
+        );
+        // all_daily_cost: /bar delta (2.0) + cur_delta (3.0 - 1.0 = 2.0) = 4.0
+        assert!(
+            (stats.all_daily_cost - 4.0).abs() < 0.01,
+            "all_daily_cost was {} but expected 4.0",
+            stats.all_daily_cost
         );
     }
 

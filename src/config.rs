@@ -16,7 +16,7 @@ pub enum Element {
     ProjectDir,
     OutputStyle,
     Alert,
-    DailyCost,
+    ProjectDailyCost,
     BurnRate,
     SpendRate,
     SessionCount,
@@ -72,7 +72,7 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::ProjectDir,
     Element::OutputStyle,
     Element::Alert,
-    Element::DailyCost,
+    Element::ProjectDailyCost,
     Element::BurnRate,
     Element::SpendRate,
     Element::SessionCount,
@@ -89,14 +89,14 @@ pub const CORE_ELEMENT_NAMES: &[&str] = &[
 ];
 
 pub const STATS_ELEMENT_NAMES: &[&str] = &[
-    "daily_cost", "burn_rate", "spend_rate", "session_count",
+    "project_daily_cost", "burn_rate", "spend_rate", "session_count",
     "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
 ];
 
 pub const ALL_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
     "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
-    "daily_cost", "burn_rate", "spend_rate", "session_count",
+    "project_daily_cost", "burn_rate", "spend_rate", "session_count",
     "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
 ];
 
@@ -133,7 +133,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, alert, daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
+        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, alert, project_daily_cost/daily_cost, burn_rate, spend_rate, session_count, daily_budget, tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend)"
     )]
     pub elements: Option<String>,
 
@@ -222,7 +222,7 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
                 Element::Alert,
             ],
             vec![
-                Element::DailyCost, Element::BurnRate, Element::SpendRate,
+                Element::ProjectDailyCost, Element::BurnRate, Element::SpendRate,
                 Element::SessionCount, Element::DailyBudget, Element::TokPerDollar,
                 Element::CacheHitRate, Element::CostVsAvg, Element::CtxTrend,
             ],
@@ -247,7 +247,7 @@ fn parse_element(s: &str) -> Option<Element> {
         "project" | "project_dir" => Some(Element::ProjectDir),
         "style" | "output_style" => Some(Element::OutputStyle),
         "alert" => Some(Element::Alert),
-        "daily_cost" => Some(Element::DailyCost),
+        "project_daily_cost" | "daily_cost" => Some(Element::ProjectDailyCost),
         "burn_rate" => Some(Element::BurnRate),
         "spend_rate" => Some(Element::SpendRate),
         "session_count" => Some(Element::SessionCount),
@@ -369,7 +369,7 @@ ELEMENTS
   alert          Conditional badges (ctx exceeded, ctx high, budget)
 
 STATS ELEMENTS (require [stats] enabled = true)
-  daily_cost     Sum of session costs today
+  project_daily_cost  Today's spend for current project (alias: daily_cost)
   burn_rate      Cost per hour (API duration)
   spend_rate     Cost per hour (wall clock)
   session_count  Number of sessions today
@@ -557,13 +557,20 @@ mod tests {
     #[test]
     fn test_parse_elements_new_stats_elements() {
         let result = parse_elements(
-            "daily_cost,burn_rate,spend_rate,session_count,daily_budget,tok_per_dollar,cache_hit_rate,cost_vs_avg,ctx_trend",
+            "project_daily_cost,burn_rate,spend_rate,session_count,daily_budget,tok_per_dollar,cache_hit_rate,cost_vs_avg,ctx_trend",
         );
         let line = &result[0];
         assert_eq!(line.len(), 9);
-        assert!(line.contains(&Element::DailyCost));
+        assert!(line.contains(&Element::ProjectDailyCost));
         assert!(line.contains(&Element::SpendRate));
         assert!(line.contains(&Element::CacheHitRate));
+    }
+
+    #[test]
+    fn test_parse_elements_daily_cost_alias() {
+        let result = parse_elements("daily_cost");
+        assert_eq!(result[0].len(), 1);
+        assert_eq!(result[0][0], Element::ProjectDailyCost);
     }
 
     #[test]
@@ -576,7 +583,7 @@ mod tests {
     #[test]
     fn test_preset_elements_full_includes_stats() {
         let all: Vec<Element> = preset_elements("full").unwrap().into_iter().flatten().collect();
-        assert!(all.contains(&Element::DailyCost));
+        assert!(all.contains(&Element::ProjectDailyCost));
         assert!(all.contains(&Element::BurnRate));
         assert!(all.contains(&Element::SpendRate));
         assert!(all.contains(&Element::CacheHitRate));

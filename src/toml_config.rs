@@ -38,7 +38,7 @@ module_config!(GitBranchConfig,   GIT_BRANCH_ICONS, "magenta");
 module_config!(CwdConfig,         CWD_ICONS,      "blue");
 module_config!(ProjectDirConfig,  PROJECT_ICONS,   "blue");
 module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
-module_config!(DailyCostConfig,   COST_ICONS,      "green");
+module_config!(ProjectDailyCostConfig, COST_ICONS, "green");
 module_config!(BurnRateConfig,    DURATION_ICONS,   "dim magenta");
 module_config!(SpendRateConfig,   DURATION_ICONS,   "dim magenta");
 module_config!(SessionCountConfig, SESSION_CT_ICONS, "dim");
@@ -144,7 +144,8 @@ pub struct BarConfig {
     pub cwd: CwdConfig,
     pub project: ProjectDirConfig,
     pub style: OutputStyleConfig,
-    pub daily_cost: DailyCostConfig,
+    #[serde(alias = "daily_cost")]
+    pub project_daily_cost: ProjectDailyCostConfig,
     pub burn_rate: BurnRateConfig,
     pub spend_rate: SpendRateConfig,
     pub session_count: SessionCountConfig,
@@ -176,7 +177,7 @@ impl Default for BarConfig {
             cwd: Default::default(),
             project: Default::default(),
             style: Default::default(),
-            daily_cost: Default::default(),
+            project_daily_cost: Default::default(),
             burn_rate: Default::default(),
             spend_rate: Default::default(),
             session_count: Default::default(),
@@ -398,7 +399,7 @@ unknown_config = 123
         assert_eq!(config.cwd.style, "blue");
         assert_eq!(config.project.style, "blue");
         assert_eq!(config.style.style, "dim");
-        assert_eq!(config.daily_cost.style, "green");
+        assert_eq!(config.project_daily_cost.style, "green");
         assert_eq!(config.burn_rate.style, "dim magenta");
         assert_eq!(config.spend_rate.style, "dim magenta");
         assert_eq!(config.tok_per_dollar.style, "dim green");

@@ -31,6 +31,7 @@ pub enum BarStyle {
     Block,
     Shade,
     Ascii,
+    Progress,
 }
 
 pub fn parse_bar_style(s: &str) -> BarStyle {
@@ -38,6 +39,7 @@ pub fn parse_bar_style(s: &str) -> BarStyle {
         "block" => BarStyle::Block,
         "shade" => BarStyle::Shade,
         "ascii" => BarStyle::Ascii,
+        "progress" => BarStyle::Progress,
         _ => BarStyle::Braille,
     }
 }
@@ -102,12 +104,37 @@ fn ascii_bar(pct: f64, width: usize, color: &str) -> String {
     out
 }
 
+const PROGRESS_EMPTY_LEFT: char = '\u{ee00}';
+const PROGRESS_EMPTY_MID: char = '\u{ee01}';
+const PROGRESS_EMPTY_RIGHT: char = '\u{ee02}';
+const PROGRESS_FULL_LEFT: char = '\u{ee03}';
+const PROGRESS_FULL_MID: char = '\u{ee04}';
+const PROGRESS_FULL_RIGHT: char = '\u{ee05}';
+
+fn progress_bar(pct: f64, width: usize, color: &str) -> String {
+    let filled = ((pct / 100.0 * width as f64).round() as usize).min(width);
+    let mut out = String::with_capacity(width * 16);
+    for i in 0..width {
+        let (full, empty) = match i {
+            0 => (PROGRESS_FULL_LEFT, PROGRESS_EMPTY_LEFT),
+            _ if i == width - 1 => (PROGRESS_FULL_RIGHT, PROGRESS_EMPTY_RIGHT),
+            _ => (PROGRESS_FULL_MID, PROGRESS_EMPTY_MID),
+        };
+        let (c, ch) = if i < filled { (color, full) } else { (DIM, empty) };
+        out.push_str(c);
+        out.push(ch);
+        out.push_str(RST);
+    }
+    out
+}
+
 pub fn render_bar(pct: f64, style: BarStyle, width: usize, color: &str) -> String {
     match style {
         BarStyle::Braille => braille_bar(pct, width, color),
         BarStyle::Block => block_bar(pct, width, color),
         BarStyle::Shade => shade_bar(pct, width, color),
         BarStyle::Ascii => ascii_bar(pct, width, color),
+        BarStyle::Progress => progress_bar(pct, width, color),
     }
 }
 

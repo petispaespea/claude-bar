@@ -40,22 +40,86 @@ pub struct Icons {
     pub fa: &'static str,
 }
 
-pub const MODEL_ICONS: Icons       = Icons { none: "",     oct: "\u{f4be} ", fa: "\u{ee0d} " };
-pub const VERSION_ICONS: Icons     = Icons { none: "",     oct: "\u{f412} ", fa: "\u{f02b} " };
-pub const CONTEXT_ICONS: Icons     = Icons { none: "",     oct: "\u{f4ed} ", fa: "\u{eeb2} " };
-pub const TOKENS_ICONS: Icons      = Icons { none: "",     oct: "\u{f4df} ", fa: "\u{f292} " };
-pub const CACHE_ICONS: Icons       = Icons { none: "",     oct: "\u{f49b} ", fa: "\u{f1c0} " };
-pub const COST_ICONS: Icons        = Icons { none: "",     oct: "\u{f439} ", fa: "\u{f09d} " };
-pub const LINES_ICONS: Icons       = Icons { none: "",     oct: "\u{f4d2} ", fa: "\u{f05f} " };
-pub const DURATION_ICONS: Icons    = Icons { none: "api:", oct: "\u{f4e3} ", fa: "\u{f254} " };
-pub const WALL_TIME_ICONS: Icons   = Icons { none: "wall:", oct: "\u{f4e3} ", fa: "\u{f254} " };
-pub const GIT_BRANCH_ICONS: Icons  = Icons { none: "",      oct: "\u{f418} ", fa: "\u{f126} " };
-pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa: "\u{f114} " };
-pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
-pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
-pub const ALERT_ICONS: Icons       = Icons { none: "",     oct: "\u{f421} ", fa: "\u{f071} " };
-pub const SESSION_CT_ICONS: Icons  = Icons { none: "#",    oct: "\u{f4a5} ", fa: "\u{f0c5} " };
-pub const COST_VS_AVG_ICONS: Icons = Icons { none: "",     oct: "\u{f4a8} ", fa: "\u{f080} " };
+pub const MODEL_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f4be} ",
+    fa: "\u{ee0d} ",
+};
+pub const VERSION_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f412} ",
+    fa: "\u{f02b} ",
+};
+pub const CONTEXT_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f4ed} ",
+    fa: "\u{eeb2} ",
+};
+pub const TOKENS_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f4df} ",
+    fa: "\u{f292} ",
+};
+pub const CACHE_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f49b} ",
+    fa: "\u{f1c0} ",
+};
+pub const COST_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f439} ",
+    fa: "\u{f09d} ",
+};
+pub const LINES_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f4d2} ",
+    fa: "\u{f05f} ",
+};
+pub const DURATION_ICONS: Icons = Icons {
+    none: "api:",
+    oct: "\u{f4e3} ",
+    fa: "\u{f254} ",
+};
+pub const WALL_TIME_ICONS: Icons = Icons {
+    none: "wall:",
+    oct: "\u{f4e3} ",
+    fa: "\u{f254} ",
+};
+pub const GIT_BRANCH_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f418} ",
+    fa: "\u{f126} ",
+};
+pub const CWD_ICONS: Icons = Icons {
+    none: "cwd:",
+    oct: "\u{f413} ",
+    fa: "\u{f114} ",
+};
+pub const PROJECT_ICONS: Icons = Icons {
+    none: "proj:",
+    oct: "\u{f46d} ",
+    fa: "\u{f015} ",
+};
+pub const STYLE_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f48f} ",
+    fa: "\u{f1fc} ",
+};
+pub const ALERT_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f421} ",
+    fa: "\u{f071} ",
+};
+pub const SESSION_CT_ICONS: Icons = Icons {
+    none: "#",
+    oct: "\u{f4a5} ",
+    fa: "\u{f0c5} ",
+};
+pub const COST_VS_AVG_ICONS: Icons = Icons {
+    none: "",
+    oct: "\u{f4a8} ",
+    fa: "\u{f080} ",
+};
 
 const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
@@ -84,24 +148,63 @@ const ALL_ELEMENTS: &[Element] = &[
 ];
 
 pub const CORE_ELEMENT_NAMES: &[&str] = &[
-    "model", "version", "context", "tokens", "cache",
-    "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
+    "model",
+    "version",
+    "context",
+    "tokens",
+    "cache",
+    "cost",
+    "lines",
+    "duration",
+    "wall_time",
+    "git_branch",
+    "cwd",
+    "project",
+    "style",
+    "alert",
 ];
 
 pub const STATS_ELEMENT_NAMES: &[&str] = &[
-    "project_daily_cost", "burn_rate", "spend_rate", "session_count",
-    "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
+    "project_daily_cost",
+    "burn_rate",
+    "spend_rate",
+    "session_count",
+    "daily_budget",
+    "tok_per_dollar",
+    "cache_hit_rate",
+    "cost_vs_avg",
+    "ctx_trend",
 ];
 
 pub const ALL_ELEMENT_NAMES: &[&str] = &[
-    "model", "version", "context", "tokens", "cache",
-    "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
-    "project_daily_cost", "burn_rate", "spend_rate", "session_count",
-    "daily_budget", "tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
+    "model",
+    "version",
+    "context",
+    "tokens",
+    "cache",
+    "cost",
+    "lines",
+    "duration",
+    "wall_time",
+    "git_branch",
+    "cwd",
+    "project",
+    "style",
+    "alert",
+    "project_daily_cost",
+    "burn_rate",
+    "spend_rate",
+    "session_count",
+    "daily_budget",
+    "tok_per_dollar",
+    "cache_hit_rate",
+    "cost_vs_avg",
+    "ctx_trend",
 ];
 
 const _: () = assert!(ALL_ELEMENTS.len() == ALL_ELEMENT_NAMES.len());
-const _: () = assert!(CORE_ELEMENT_NAMES.len() + STATS_ELEMENT_NAMES.len() == ALL_ELEMENT_NAMES.len());
+const _: () =
+    assert!(CORE_ELEMENT_NAMES.len() + STATS_ELEMENT_NAMES.len() == ALL_ELEMENT_NAMES.len());
 
 #[derive(Parser)]
 #[command(
@@ -172,7 +275,12 @@ pub struct Cli {
     #[arg(long, help = "Show usage statistics")]
     pub stats: bool,
 
-    #[arg(long, value_name = "N", default_value = "7", help = "Stats lookback in days")]
+    #[arg(
+        long,
+        value_name = "N",
+        default_value = "7",
+        help = "Stats lookback in days"
+    )]
     pub stats_days: u64,
 
     #[arg(long, value_name = "PATH", help = "Filter stats to a specific project")]
@@ -181,7 +289,10 @@ pub struct Cli {
     #[arg(long, help = "Delete the stats log file")]
     pub stats_clear: bool,
 
-    #[arg(long, help = "Confirm destructive operations (required for --stats-clear)")]
+    #[arg(
+        long,
+        help = "Confirm destructive operations (required for --stats-clear)"
+    )]
     pub yes: bool,
 }
 
@@ -212,19 +323,33 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
         ]],
         "full" => vec![
             vec![
-                Element::Model, Element::Version, Element::Context,
-                Element::Tokens, Element::Cache, Element::Cost,
+                Element::Model,
+                Element::Version,
+                Element::Context,
+                Element::Tokens,
+                Element::Cache,
+                Element::Cost,
                 Element::Lines,
             ],
             vec![
-                Element::Duration, Element::WallTime, Element::GitBranch,
-                Element::Cwd, Element::ProjectDir, Element::OutputStyle,
+                Element::Duration,
+                Element::WallTime,
+                Element::GitBranch,
+                Element::Cwd,
+                Element::ProjectDir,
+                Element::OutputStyle,
                 Element::Alert,
             ],
             vec![
-                Element::ProjectDailyCost, Element::BurnRate, Element::SpendRate,
-                Element::SessionCount, Element::DailyBudget, Element::TokPerDollar,
-                Element::CacheHitRate, Element::CostVsAvg, Element::CtxTrend,
+                Element::ProjectDailyCost,
+                Element::BurnRate,
+                Element::SpendRate,
+                Element::SessionCount,
+                Element::DailyBudget,
+                Element::TokPerDollar,
+                Element::CacheHitRate,
+                Element::CostVsAvg,
+                Element::CtxTrend,
             ],
         ],
         _ => return None,
@@ -312,7 +437,10 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
         }
     }
     if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
-        debug(&format!("elements: using TOML layout [{}]", layout.join(", ")));
+        debug(&format!(
+            "elements: using TOML layout [{}]",
+            layout.join(", ")
+        ));
         return split_into_lines(layout.iter().map(|s| s.as_str()));
     }
     debug("elements: using built-in default preset");
@@ -387,6 +515,7 @@ BAR STYLES (for context element)
   block          Filled/empty blocks (▰▱)
   shade          Gradient shading (█▓▒░)
   ascii          Plain ASCII ([###-------])
+  progress       Nerd Font progress glyphs ()
 
 ICON SETS
   octicons       Octicons (default)
@@ -582,7 +711,11 @@ mod tests {
 
     #[test]
     fn test_preset_elements_full_includes_stats() {
-        let all: Vec<Element> = preset_elements("full").unwrap().into_iter().flatten().collect();
+        let all: Vec<Element> = preset_elements("full")
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .collect();
         assert!(all.contains(&Element::ProjectDailyCost));
         assert!(all.contains(&Element::BurnRate));
         assert!(all.contains(&Element::SpendRate));

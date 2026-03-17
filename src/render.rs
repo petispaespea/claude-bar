@@ -1,11 +1,11 @@
 use crate::config::{
     Element, IconMode, Icons, ALERT_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
     COST_VS_AVG_ICONS, CWD_ICONS, DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS,
-    PROJECT_ICONS, SESSION_CT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
+    PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
 use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::input::Input;
-use crate::stats::TodayStats;
+use crate::stats::AggregateStats;
 use crate::style::{apply_style, parse_style};
 use crate::toml_config::BarConfig;
 
@@ -296,7 +296,7 @@ fn severity_style(severity: &str) -> (&'static str, &'static str) {
     }
 }
 
-fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
     let mut badges = Vec::new();
 
     for rule in &config.alerts {
@@ -312,7 +312,7 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, today_stats: 
                 }
             }
             "cost_high" => {
-                if let Some(stats) = today_stats {
+                if let Some(stats) = agg_stats {
                     stats.daily_budget_pct.is_some_and(|pct| pct >= 100.0)
                 } else {
                     false
@@ -335,36 +335,30 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, today_stats: 
     }
 }
 
-fn render_project_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let stats = today_stats.as_ref()?;
-    render_element(&config.project_daily_cost.symbol, &config.project_daily_cost.style, mode,
-        &COST_ICONS, Some(format!("${:.2} today", stats.project_daily_cost)))
+fn render_project_today_cost(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let stats = agg_stats.as_ref()?;
+    render_element(&config.project_today_cost.symbol, &config.project_today_cost.style, mode,
+        &COST_ICONS, Some(format!("${:.2} today", stats.project_today_cost)))
 }
 
-fn render_burn_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let rate = today_stats.as_ref()?.burn_rate?;
+fn render_burn_rate(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let rate = agg_stats.as_ref()?.burn_rate?;
     render_element(&config.burn_rate.symbol, &config.burn_rate.style, mode,
         &DURATION_ICONS, Some(format!("${rate:.2}/hr")))
 }
 
-fn render_spend_rate(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let rate = today_stats.as_ref()?.spend_rate?;
+fn render_spend_rate(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let rate = agg_stats.as_ref()?.spend_rate?;
     render_element(&config.spend_rate.symbol, &config.spend_rate.style, mode,
         &DURATION_ICONS, Some(format!("${rate:.2}/hr")))
 }
 
-fn render_session_count(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let count = today_stats.as_ref()?.session_count;
-    render_element(&config.session_count.symbol, &config.session_count.style, mode,
-        &SESSION_CT_ICONS, Some(format!("#{count}")))
-}
-
-fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let stats = today_stats.as_ref()?;
+fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let stats = agg_stats.as_ref()?;
     let pct = stats.daily_budget_pct?;
     let cfg = &config.daily_budget;
     let limit = cfg.limit;
-    let cost = stats.all_daily_cost;
+    let cost = stats.all_today_cost;
 
     let i = icon(&cfg.symbol, mode, &COST_ICONS);
     let color = pct_color(pct);
@@ -385,10 +379,10 @@ fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, today
     Some(styled_or_raw(out, &cfg.style))
 }
 
-fn render_tok_per_dollar(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let tpd = today_stats.as_ref()?.tok_per_dollar?;
+fn render_session_tok_per_dollar(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let tpd = agg_stats.as_ref()?.session_tok_per_dollar?;
     let formatted = crate::format::format_tokens(tpd as u64);
-    render_element(&config.tok_per_dollar.symbol, &config.tok_per_dollar.style, mode,
+    render_element(&config.session_tok_per_dollar.symbol, &config.session_tok_per_dollar.style, mode,
         &TOKENS_ICONS, Some(format!("{formatted}/$")))
 }
 
@@ -401,14 +395,14 @@ fn render_cache_hit_rate(input: &Input, mode: IconMode, config: &BarConfig) -> O
         &CACHE_ICONS, Some(format!("{pct:.0}%")))
 }
 
-fn render_cost_vs_avg(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let ratio = today_stats.as_ref()?.cost_vs_avg?;
+fn render_cost_vs_avg(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let ratio = agg_stats.as_ref()?.cost_vs_avg?;
     render_element(&config.cost_vs_avg.symbol, &config.cost_vs_avg.style, mode,
         &COST_VS_AVG_ICONS, Some(format!("{ratio:.1}× avg")))
 }
 
-fn render_ctx_trend(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let delta = today_stats.as_ref()?.ctx_trend?;
+fn render_ctx_trend(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let delta = agg_stats.as_ref()?.ctx_trend?;
     let arrow = if delta > 2.0 { "▲" } else if delta < -2.0 { "▼" } else { "▸" };
     let color = if delta > 2.0 { RED } else if delta < -2.0 { GREEN } else { DIM };
     let cfg = &config.ctx_trend;
@@ -417,13 +411,13 @@ fn render_ctx_trend(_input: &Input, mode: IconMode, config: &BarConfig, today_st
     Some(styled_or_raw(content, &cfg.style))
 }
 
-fn render_avg_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
-    let avg = today_stats.as_ref()?.avg_daily_cost?;
+fn render_avg_daily_cost(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
+    let avg = agg_stats.as_ref()?.avg_daily_cost?;
     render_element(&config.avg_daily_cost.symbol, &config.avg_daily_cost.style, mode,
         &COST_ICONS, Some(format!("${avg:.2}/day")))
 }
 
-pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, today_stats: &Option<TodayStats>) -> Option<String> {
+pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
     match elem {
         Element::Model => render_model(input, mode, config),
         Element::Version => render_version(input, mode, config),
@@ -438,16 +432,15 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::Cwd => render_cwd(input, mode, config),
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),
-        Element::Alert => render_alert(input, mode, config, today_stats),
-        Element::ProjectDailyCost => render_project_daily_cost(input, mode, config, today_stats),
-        Element::BurnRate => render_burn_rate(input, mode, config, today_stats),
-        Element::SpendRate => render_spend_rate(input, mode, config, today_stats),
-        Element::SessionCount => render_session_count(input, mode, config, today_stats),
-        Element::DailyBudget => render_daily_budget(input, mode, config, today_stats),
-        Element::TokPerDollar => render_tok_per_dollar(input, mode, config, today_stats),
+        Element::Alert => render_alert(input, mode, config, agg_stats),
+        Element::ProjectTodayCost => render_project_today_cost(input, mode, config, agg_stats),
+        Element::BurnRate => render_burn_rate(input, mode, config, agg_stats),
+        Element::SpendRate => render_spend_rate(input, mode, config, agg_stats),
+        Element::DailyBudget => render_daily_budget(input, mode, config, agg_stats),
+        Element::SessionTokPerDollar => render_session_tok_per_dollar(input, mode, config, agg_stats),
         Element::CacheHitRate => render_cache_hit_rate(input, mode, config),
-        Element::CostVsAvg => render_cost_vs_avg(input, mode, config, today_stats),
-        Element::CtxTrend => render_ctx_trend(input, mode, config, today_stats),
-        Element::AvgDailyCost => render_avg_daily_cost(input, mode, config, today_stats),
+        Element::CostVsAvg => render_cost_vs_avg(input, mode, config, agg_stats),
+        Element::CtxTrend => render_ctx_trend(input, mode, config, agg_stats),
+        Element::AvgDailyCost => render_avg_daily_cost(input, mode, config, agg_stats),
     }
 }

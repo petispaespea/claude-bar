@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{
     debug, env, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, COST_VS_AVG_ICONS, CWD_ICONS,
-    DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS, SESSION_CT_ICONS,
+    DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS,
     STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
 
@@ -38,13 +38,12 @@ module_config!(GitBranchConfig,   GIT_BRANCH_ICONS, "magenta");
 module_config!(CwdConfig,         CWD_ICONS,      "blue");
 module_config!(ProjectDirConfig,  PROJECT_ICONS,   "blue");
 module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
-module_config!(ProjectDailyCostConfig, COST_ICONS, "green");
-module_config!(BurnRateConfig,    DURATION_ICONS,   "dim magenta");
-module_config!(SpendRateConfig,   DURATION_ICONS,   "dim magenta");
-module_config!(SessionCountConfig, SESSION_CT_ICONS, "dim");
-module_config!(TokPerDollarConfig, TOKENS_ICONS,     "dim green");
-module_config!(CacheHitRateConfig, CACHE_ICONS,      "dim");
-module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim green");
+module_config!(ProjectTodayCostConfig, COST_ICONS, "blue");
+module_config!(BurnRateConfig,    DURATION_ICONS,   "cyan");
+module_config!(SpendRateConfig,   DURATION_ICONS,   "cyan");
+module_config!(SessionTokPerDollarConfig, TOKENS_ICONS,     "cyan");
+module_config!(CacheHitRateConfig, CACHE_ICONS,      "cyan");
+module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "blue");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -58,7 +57,7 @@ impl Default for AvgDailyCostConfig {
     fn default() -> Self {
         Self {
             symbol: COST_ICONS.oct.to_string(),
-            style: "dim green".to_string(),
+            style: "blue".to_string(),
             lookback_days: 30,
         }
     }
@@ -181,12 +180,11 @@ pub struct BarConfig {
     pub project: ProjectDirConfig,
     pub style: OutputStyleConfig,
     #[serde(alias = "daily_cost")]
-    pub project_daily_cost: ProjectDailyCostConfig,
+    pub project_today_cost: ProjectTodayCostConfig,
     pub burn_rate: BurnRateConfig,
     pub spend_rate: SpendRateConfig,
-    pub session_count: SessionCountConfig,
     pub daily_budget: DailyBudgetConfig,
-    pub tok_per_dollar: TokPerDollarConfig,
+    pub session_tok_per_dollar: SessionTokPerDollarConfig,
     pub cache_hit_rate: CacheHitRateConfig,
     pub cost_vs_avg: CostVsAvgConfig,
     pub avg_daily_cost: AvgDailyCostConfig,
@@ -214,12 +212,11 @@ impl Default for BarConfig {
             cwd: Default::default(),
             project: Default::default(),
             style: Default::default(),
-            project_daily_cost: Default::default(),
+            project_today_cost: Default::default(),
             burn_rate: Default::default(),
             spend_rate: Default::default(),
-            session_count: Default::default(),
             daily_budget: Default::default(),
-            tok_per_dollar: Default::default(),
+            session_tok_per_dollar: Default::default(),
             cache_hit_rate: Default::default(),
             cost_vs_avg: Default::default(),
             avg_daily_cost: Default::default(),
@@ -328,12 +325,13 @@ pub fn config_toml() -> String {
     let mut config = BarConfig::default();
     config.stats.enabled = true;
     let brk = crate::config::LINE_BREAK.to_string();
-    let core = crate::config::CORE_ELEMENT_NAMES;
-    let elements = core[..7].iter().map(|s| s.to_string())
+    let elements: Vec<String> = [
+        "model", "style", "version", "context", "ctx_trend", "daily_budget", "cwd", "git_branch",
+    ].iter().map(|s| s.to_string())
         .chain(std::iter::once(brk.clone()))
-        .chain(core[7..].iter().map(|s| s.to_string()))
+        .chain(["cost", "lines", "duration", "burn_rate", "wall_time", "spend_rate", "tokens", "session_tok_per_dollar", "cache", "cache_hit_rate"].iter().map(|s| s.to_string()))
         .chain(std::iter::once(brk))
-        .chain(crate::config::STATS_ELEMENT_NAMES.iter().map(|s| s.to_string()))
+        .chain(["project", "project_today_cost", "cost_vs_avg", "avg_daily_cost", "alert"].iter().map(|s| s.to_string()))
         .collect();
     config.layout.elements = elements;
     let body = toml::to_string_pretty(&config).unwrap();
@@ -437,13 +435,12 @@ unknown_config = 123
         assert_eq!(config.cwd.style, "blue");
         assert_eq!(config.project.style, "blue");
         assert_eq!(config.style.style, "dim");
-        assert_eq!(config.project_daily_cost.style, "green");
-        assert_eq!(config.burn_rate.style, "dim magenta");
-        assert_eq!(config.spend_rate.style, "dim magenta");
-        assert_eq!(config.tok_per_dollar.style, "dim green");
-        assert_eq!(config.cost_vs_avg.style, "dim green");
-        assert_eq!(config.session_count.style, "dim");
-        assert_eq!(config.cache_hit_rate.style, "dim");
+        assert_eq!(config.project_today_cost.style, "blue");
+        assert_eq!(config.burn_rate.style, "cyan");
+        assert_eq!(config.spend_rate.style, "cyan");
+        assert_eq!(config.session_tok_per_dollar.style, "cyan");
+        assert_eq!(config.cost_vs_avg.style, "blue");
+        assert_eq!(config.cache_hit_rate.style, "cyan");
     }
 
     #[test]

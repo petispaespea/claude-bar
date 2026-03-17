@@ -234,17 +234,28 @@ pub fn group_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
 }
 
 #[derive(Debug)]
-pub struct TodayStats {
-    pub project_daily_cost: f64,
-    pub all_daily_cost: f64,
+pub struct AggregateStats {
+    pub project_today_cost: f64,
+    pub all_today_cost: f64,
     pub burn_rate: Option<f64>,
     pub spend_rate: Option<f64>,
-    pub session_count: usize,
-    pub tok_per_dollar: Option<f64>,
+    pub session_tok_per_dollar: Option<f64>,
     pub cost_vs_avg: Option<f64>,
     pub ctx_trend: Option<f64>,
     pub daily_budget_pct: Option<f64>,
     pub avg_daily_cost: Option<f64>,
+}
+
+pub struct AggregateParams<'a> {
+    pub today_records: &'a [StatsRecord],
+    pub current_session_id: Option<&'a str>,
+    pub current_cost: Option<f64>,
+    pub current_api_ms: Option<u64>,
+    pub current_wall_ms: Option<u64>,
+    pub current_out_tok: Option<u64>,
+    pub budget_limit: Option<f64>,
+    pub current_project: Option<&'a str>,
+    pub ctx_lookback_secs: u64,
 }
 
 fn cost_per_hour(cost: Option<f64>, ms: Option<u64>, min_ms: u64) -> Option<f64> {
@@ -264,85 +275,80 @@ fn current_session_index(sessions: &[Session], current_session_id: Option<&str>)
     }
 }
 
-pub fn compute_today_stats(
-    today_records: &[StatsRecord],
-    current_session_id: Option<&str>,
-    current_cost: Option<f64>,
-    current_api_ms: Option<u64>,
-    current_wall_ms: Option<u64>,
-    current_out_tok: Option<u64>,
-    budget_limit: Option<f64>,
-    current_project: Option<&str>,
-    ctx_lookback_secs: u64,
-) -> TodayStats {
-    let ctx_trend = compute_ctx_trend(today_records, ctx_lookback_secs);
-    let sessions = group_sessions(today_records);
+pub fn compute_aggregate_stats(params: &AggregateParams) -> AggregateStats {
+    let ctx_trend = compute_ctx_trend(params.today_records, params.ctx_lookback_secs);
+    let sessions = group_sessions(params.today_records);
     let matches_project = |s: &Session| -> bool {
-        current_project.is_some_and(|cp| s.project() == Some(cp))
+        params.current_project.is_some_and(|cp| s.project() == Some(cp))
     };
-    let session_count = sessions.iter().filter(|s| matches_project(s)).count();
-    let cur_idx = current_session_index(&sessions, current_session_id);
+    let cur_idx = current_session_index(&sessions, params.current_session_id);
 
-    let mut other_cost = 0.0_f64;
     let mut all_delta = 0.0_f64;
     let mut project_delta = 0.0_f64;
-    let mut other_count = 0_usize;
     let mut cur_first_cost = 0.0_f64;
     let cur_matches_project = cur_idx.is_some_and(|i| matches_project(&sessions[i]));
 
+    let mut project_costs: HashMap<&str, f64> = HashMap::new();
+
     for (i, s) in sessions.iter().enumerate() {
         if Some(i) != cur_idx {
-            let fc = s.final_cost();
             let delta = s.cost_delta();
-            other_cost += fc;
             all_delta += delta;
             if matches_project(s) {
                 project_delta += delta;
             }
-            other_count += 1;
+            if let Some(proj) = s.project()
+                && params.current_project != Some(proj)
+            {
+                *project_costs.entry(proj).or_insert(0.0) += delta;
+            }
         } else {
             cur_first_cost = s.first_cost();
         }
     }
-    let cur_delta = (current_cost.unwrap_or(0.0) - cur_first_cost).max(0.0);
-    let all_daily_cost = all_delta + cur_delta;
-    let project_daily_cost = project_delta + if cur_matches_project { cur_delta } else { 0.0 };
+    let cur_delta = (params.current_cost.unwrap_or(0.0) - cur_first_cost).max(0.0);
+    let all_today_cost = all_delta + cur_delta;
+    let project_today_cost = project_delta + if cur_matches_project { cur_delta } else { 0.0 };
 
-    let burn_rate = cost_per_hour(current_cost, current_api_ms, 60_000);
+    let burn_rate = cost_per_hour(params.current_cost, params.current_api_ms, 60_000);
 
-    let spend_rate = cost_per_hour(current_cost, current_wall_ms, 300_000);
+    let spend_rate = cost_per_hour(params.current_cost, params.current_wall_ms, 300_000);
 
-    let tok_per_dollar = match (current_out_tok, current_cost) {
+    let session_tok_per_dollar = match (params.current_out_tok, params.current_cost) {
         (Some(tok), Some(c)) if c > 0.001 => Some(tok as f64 / c),
         _ => None,
     };
 
-    let cost_vs_avg = if other_count > 0 {
-        let avg = other_cost / other_count as f64;
-        if avg > 0.001 {
-            Some(current_cost.unwrap_or(0.0) / avg)
+    let cost_vs_avg = {
+        let (sum, count) = project_costs
+            .values()
+            .fold((0.0, 0usize), |(s, c), &cost| (s + cost, c + 1));
+        if count > 0 {
+            let avg = sum / count as f64;
+            if avg > 0.001 {
+                Some(project_today_cost / avg)
+            } else {
+                None
+            }
         } else {
             None
         }
-    } else {
-        None
     };
 
-    let daily_budget_pct = budget_limit.map(|limit| {
+    let daily_budget_pct = params.budget_limit.map(|limit| {
         if limit > 0.0 {
-            all_daily_cost / limit * 100.0
+            all_today_cost / limit * 100.0
         } else {
             0.0
         }
     });
 
-    TodayStats {
-        project_daily_cost,
-        all_daily_cost,
+    AggregateStats {
+        project_today_cost,
+        all_today_cost,
         burn_rate,
         spend_rate,
-        session_count,
-        tok_per_dollar,
+        session_tok_per_dollar,
         cost_vs_avg,
         ctx_trend,
         daily_budget_pct,
@@ -655,31 +661,56 @@ mod tests {
         assert_eq!(lens, vec![1, 2]);
     }
 
+    fn make_params<'a>(
+        records: &'a [StatsRecord],
+        session_id: Option<&'a str>,
+        cost: Option<f64>,
+        api_ms: Option<u64>,
+        wall_ms: Option<u64>,
+        out_tok: Option<u64>,
+        budget: Option<f64>,
+        project: Option<&'a str>,
+    ) -> AggregateParams<'a> {
+        AggregateParams {
+            today_records: records,
+            current_session_id: session_id,
+            current_cost: cost,
+            current_api_ms: api_ms,
+            current_wall_ms: wall_ms,
+            current_out_tok: out_tok,
+            budget_limit: budget,
+            current_project: project,
+            ctx_lookback_secs: LOOKBACK,
+        }
+    }
+
     #[test]
-    fn compute_today_stats_basic() {
+    fn compute_aggregate_stats_basic() {
         let records = vec![
             record_with_session(1000, 1.0, "/proj", "aaa"),
             record_with_session(1100, 2.0, "/proj", "aaa"),
             record_with_session(1200, 0.5, "/proj", "bbb"),
             record_with_session(1300, 1.5, "/proj", "bbb"),
         ];
-        let stats = compute_today_stats(&records, Some("bbb"), Some(1.5), Some(120_000), None, Some(500), None, Some("/proj"), LOOKBACK);
-        // all_daily_cost: session aaa delta (2-1=1) + cur_delta (1.5-0.5=1) = 2.0
-        assert!((stats.all_daily_cost - 2.0).abs() < 0.01);
-        assert_eq!(stats.session_count, 2);
+        let params = make_params(&records, Some("bbb"), Some(1.5), Some(120_000), None, Some(500), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
+        // all_today_cost: session aaa delta (2-1=1) + cur_delta (1.5-0.5=1) = 2.0
+        assert!((stats.all_today_cost - 2.0).abs() < 0.01);
     }
 
     #[test]
     fn burn_rate_under_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(1.0), Some(30_000), None, Some(100), None, Some("/proj"), LOOKBACK);
+        let params = make_params(&records, None, Some(1.0), Some(30_000), None, Some(100), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
         assert!(stats.burn_rate.is_none());
     }
 
     #[test]
     fn burn_rate_over_one_minute() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None, Some("/proj"), LOOKBACK);
+        let params = make_params(&records, None, Some(6.0), Some(3_600_000), None, Some(100), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
         assert!((stats.burn_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
@@ -726,67 +757,72 @@ mod tests {
         records: &[StatsRecord],
         session_id: &str,
         current_cost: f64,
-    ) -> TodayStats {
-        compute_today_stats(
-            records,
-            Some(session_id),
-            Some(current_cost),
-            Some(22_440_000),
-            Some(461_880_000),
-            Some(1000),
-            None,
-            Some("/proj"),
-            LOOKBACK,
-        )
+    ) -> AggregateStats {
+        let params = AggregateParams {
+            today_records: records,
+            current_session_id: Some(session_id),
+            current_cost: Some(current_cost),
+            current_api_ms: Some(22_440_000),
+            current_wall_ms: Some(461_880_000),
+            current_out_tok: Some(1000),
+            budget_limit: None,
+            current_project: Some("/proj"),
+            ctx_lookback_secs: LOOKBACK,
+        };
+        compute_aggregate_stats(&params)
     }
 
-    fn assert_daily_cost(stats: &TodayStats, expected: f64, ceiling: f64) {
+    fn assert_daily_cost(stats: &AggregateStats, expected: f64, ceiling: f64) {
         assert!(
-            (stats.project_daily_cost - expected).abs() < 0.1,
-            "project_daily_cost was ${:.2} but expected ${:.2} (sum of deltas)",
-            stats.project_daily_cost, expected
+            (stats.project_today_cost - expected).abs() < 0.1,
+            "project_today_cost was ${:.2} but expected ${:.2} (sum of deltas)",
+            stats.project_today_cost, expected
         );
         assert!(
-            stats.project_daily_cost <= ceiling,
-            "project_daily_cost ${:.2} exceeds total session cost ${:.2}",
-            stats.project_daily_cost, ceiling
+            stats.project_today_cost <= ceiling,
+            "project_today_cost ${:.2} exceeds total session cost ${:.2}",
+            stats.project_today_cost, ceiling
         );
     }
 
     #[test]
     fn spend_rate_under_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None, Some("/proj"), LOOKBACK);
+        let params = make_params(&records, None, Some(1.0), Some(60_000), Some(200_000), Some(100), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
         assert!(stats.spend_rate.is_none());
     }
 
     #[test]
     fn spend_rate_over_five_minutes() {
         let records = vec![record(1000, 1.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None, Some("/proj"), LOOKBACK);
+        let params = make_params(&records, None, Some(6.0), Some(60_000), Some(3_600_000), Some(100), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
         assert!((stats.spend_rate.unwrap() - 6.0).abs() < 0.01);
     }
 
     #[test]
     fn tok_per_dollar_zero_cost() {
         let records = vec![record(1000, 0.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(0.0), Some(60_000), None, Some(1000), None, Some("/proj"), LOOKBACK);
-        assert!(stats.tok_per_dollar.is_none());
+        let params = make_params(&records, None, Some(0.0), Some(60_000), None, Some(1000), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
+        assert!(stats.session_tok_per_dollar.is_none());
     }
 
     #[test]
-    fn cost_vs_avg_single_session() {
+    fn cost_vs_avg_single_project() {
         let records = vec![record(1000, 5.0, "/proj")];
-        let stats = compute_today_stats(&records, None, Some(5.0), Some(60_000), None, Some(100), None, Some("/proj"), LOOKBACK);
+        let params = make_params(&records, None, Some(5.0), Some(60_000), None, Some(100), None, Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
         assert!(stats.cost_vs_avg.is_none());
     }
 
     #[test]
     fn daily_budget_pct() {
         let records = vec![record(1000, 10.0, "/proj"), record(2000, 50.0, "/proj")];
-        let stats =
-            compute_today_stats(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0), Some("/proj"), LOOKBACK);
-        // all_daily_cost = delta (50 - 10 = 40), budget = 100, pct = 40%
+        let params = make_params(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0), Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
+        // all_today_cost = delta (50 - 10 = 40), budget = 100, pct = 40%
         assert!((stats.daily_budget_pct.unwrap() - 40.0).abs() < 0.01);
     }
 
@@ -798,35 +834,37 @@ mod tests {
             record_with_session(2500, 2.0, "/bar", "bbb"),
             record_with_session(3000, 5.0, "/foo", "aaa"),
         ];
-        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None, Some("/foo"), LOOKBACK);
-        // project_daily_cost: only /foo sessions' delta = cur_delta = 5.0 - 0.5 = 4.5
+        let params = make_params(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None, Some("/foo"));
+        let stats = compute_aggregate_stats(&params);
+        // project_today_cost: only /foo sessions' delta = cur_delta = 5.0 - 0.5 = 4.5
         assert!(
-            (stats.project_daily_cost - 4.5).abs() < 0.01,
-            "project_daily_cost was {} but expected 4.5",
-            stats.project_daily_cost
+            (stats.project_today_cost - 4.5).abs() < 0.01,
+            "project_today_cost was {} but expected 4.5",
+            stats.project_today_cost
         );
-        // all_daily_cost: /bar delta (2.0 - 1.0 = 1.0) + cur_delta (4.5) = 5.5
+        // all_today_cost: /bar delta (2.0 - 1.0 = 1.0) + cur_delta (4.5) = 5.5
         assert!(
-            (stats.all_daily_cost - 5.5).abs() < 0.01,
-            "all_daily_cost was {} but expected 5.5",
-            stats.all_daily_cost
+            (stats.all_today_cost - 5.5).abs() < 0.01,
+            "all_today_cost was {} but expected 5.5",
+            stats.all_today_cost
         );
     }
 
     #[test]
-    fn all_daily_cost_spanning_session() {
+    fn all_today_cost_spanning_session() {
         let records = vec![
             record_with_session(1000, 3.0, "/proj", "aaa"),
             record_with_session(2000, 5.0, "/proj", "aaa"),
         ];
-        let stats = compute_today_stats(&records, Some("aaa"), Some(5.0), None, None, None, Some(10.0), Some("/proj"), LOOKBACK);
-        // all_daily_cost = today's delta only = $5 - $3 = $2
+        let params = make_params(&records, Some("aaa"), Some(5.0), None, None, None, Some(10.0), Some("/proj"));
+        let stats = compute_aggregate_stats(&params);
+        // all_today_cost = today's delta only = $5 - $3 = $2
         assert!(
-            (stats.all_daily_cost - 2.0).abs() < 0.01,
-            "all_daily_cost was {} but expected 2.0",
-            stats.all_daily_cost
+            (stats.all_today_cost - 2.0).abs() < 0.01,
+            "all_today_cost was {} but expected 2.0",
+            stats.all_today_cost
         );
-        // daily_budget_pct should use all_daily_cost: $2 / $10 = 20%
+        // daily_budget_pct should use all_today_cost: $2 / $10 = 20%
         assert!(
             (stats.daily_budget_pct.unwrap() - 20.0).abs() < 0.01,
             "daily_budget_pct was {} but expected 20.0",
@@ -835,25 +873,26 @@ mod tests {
     }
 
     #[test]
-    fn project_daily_cost_filters_by_project() {
+    fn project_today_cost_filters_by_project() {
         let records = vec![
             record_with_session(1000, 1.0, "/foo", "aaa"),
             record_with_session(1100, 3.0, "/foo", "aaa"),
             record_with_session(1050, 0.5, "/bar", "bbb"),
             record_with_session(1150, 2.5, "/bar", "bbb"),
         ];
-        let stats = compute_today_stats(&records, Some("aaa"), Some(3.0), None, None, None, None, Some("/bar"), LOOKBACK);
-        // project_daily_cost: only /bar sessions' delta = 2.5 - 0.5 = 2.0 (current session not in /bar)
+        let params = make_params(&records, Some("aaa"), Some(3.0), None, None, None, None, Some("/bar"));
+        let stats = compute_aggregate_stats(&params);
+        // project_today_cost: only /bar sessions' delta = 2.5 - 0.5 = 2.0 (current session not in /bar)
         assert!(
-            (stats.project_daily_cost - 2.0).abs() < 0.01,
-            "project_daily_cost was {} but expected 2.0",
-            stats.project_daily_cost
+            (stats.project_today_cost - 2.0).abs() < 0.01,
+            "project_today_cost was {} but expected 2.0",
+            stats.project_today_cost
         );
-        // all_daily_cost: /bar delta (2.0) + cur_delta (3.0 - 1.0 = 2.0) = 4.0
+        // all_today_cost: /bar delta (2.0) + cur_delta (3.0 - 1.0 = 2.0) = 4.0
         assert!(
-            (stats.all_daily_cost - 4.0).abs() < 0.01,
-            "all_daily_cost was {} but expected 4.0",
-            stats.all_daily_cost
+            (stats.all_today_cost - 4.0).abs() < 0.01,
+            "all_today_cost was {} but expected 4.0",
+            stats.all_today_cost
         );
     }
 

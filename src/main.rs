@@ -78,7 +78,7 @@ fn main() {
         stats::append_record(&input);
     }
 
-    let today_stats = if config.stats.enabled {
+    let agg_stats = if config.stats.enabled {
         let today = stats::load_today_records(&config.stats.day_window);
         let current_cost = input.cost.as_ref().and_then(|c| c.total_cost_usd);
         let current_api_ms = input.cost.as_ref().and_then(|c| c.total_api_duration_ms);
@@ -90,16 +90,18 @@ fn main() {
             None
         };
         let current_project = input.workspace.as_ref().and_then(|w| w.project_dir.as_deref());
-        Some(stats::compute_today_stats(
-            &today,
-            input.session_id.as_deref(),
-            current_cost,
-            current_api_ms,
-            current_wall_ms,
-            current_out_tok,
-            budget_limit,
-            current_project,
-            config.ctx_trend.lookback_secs,
+        Some(stats::compute_aggregate_stats(
+            &stats::AggregateParams {
+                today_records: &today,
+                current_session_id: input.session_id.as_deref(),
+                current_cost,
+                current_api_ms,
+                current_wall_ms,
+                current_out_tok,
+                budget_limit,
+                current_project,
+                ctx_lookback_secs: config.ctx_trend.lookback_secs,
+            },
         ))
         .map(|mut s| {
             if let Some(proj) = current_project {
@@ -115,7 +117,7 @@ fn main() {
         .iter()
         .map(|line| {
             line.iter()
-                .filter_map(|e| render::render(*e, &input, icon_mode, &config, &today_stats))
+                .filter_map(|e| render::render(*e, &input, icon_mode, &config, &agg_stats))
                 .collect::<Vec<_>>()
                 .join(&config.separator)
         })

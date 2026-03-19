@@ -26,24 +26,24 @@ macro_rules! module_config {
     };
 }
 
-module_config!(ModelConfig,       MODEL_ICONS,    "cyan");
+module_config!(ModelConfig,       MODEL_ICONS,    "magenta");
 module_config!(VersionConfig,     VERSION_ICONS,  "dim");
 module_config!(TokensConfig,      TOKENS_ICONS,   "dim");
 module_config!(CacheConfig,       CACHE_ICONS,    "dim");
 module_config!(CostConfig,        COST_ICONS,     "green");
 module_config!(LinesConfig,       LINES_ICONS,    "");
-module_config!(DurationConfig,    DURATION_ICONS,  "magenta");
-module_config!(WallTimeConfig,    WALL_TIME_ICONS, "magenta");
+module_config!(DurationConfig,    DURATION_ICONS,  "dim cyan");
+module_config!(WallTimeConfig,    WALL_TIME_ICONS, "cyan");
 module_config!(GitBranchConfig,   GIT_BRANCH_ICONS, "magenta");
-module_config!(CwdConfig,         CWD_ICONS,      "blue");
+module_config!(CwdConfig,         CWD_ICONS,      "dim blue");
 module_config!(ProjectDirConfig,  PROJECT_ICONS,   "blue");
-module_config!(OutputStyleConfig, STYLE_ICONS,     "dim");
+module_config!(OutputStyleConfig, STYLE_ICONS,     "dim magenta");
 module_config!(ProjectTodayCostConfig, COST_ICONS, "blue");
-module_config!(BurnRateConfig,    DURATION_ICONS,   "cyan");
-module_config!(SpendRateConfig,   DURATION_ICONS,   "cyan");
-module_config!(SessionTokPerDollarConfig, TOKENS_ICONS,     "cyan");
+module_config!(BurnRateConfig,    BURN_RATE_ICONS,  "dim cyan");
+module_config!(SpendRateConfig,   COST_ICONS,   "cyan");
+module_config!(SessionTokPerDollarConfig, TOKENS_ICONS,     "dim cyan");
 module_config!(CacheHitRateConfig, CACHE_ICONS,      "cyan");
-module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "blue");
+module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim blue");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -57,7 +57,7 @@ impl Default for AvgDailyCostConfig {
     fn default() -> Self {
         Self {
             symbol: COST_ICONS.oct.to_string(),
-            style: "blue".to_string(),
+            style: "dim blue".to_string(),
             lookback_days: 30,
         }
     }
@@ -355,7 +355,7 @@ mod tests {
         let config: BarConfig = toml::from_str("").expect("Should deserialize");
         assert_eq!(config.separator, " | ");
         assert_eq!(config.model.symbol, "\u{f4be} ");
-        assert_eq!(config.model.style, "cyan");
+        assert_eq!(config.model.style, "magenta");
     }
 
     #[test]
@@ -409,7 +409,7 @@ unknown_config = 123
         assert_eq!(config.cost.symbol, "\u{f439} ");
         assert_eq!(config.lines.symbol, "\u{f4d2} ");
         assert_eq!(config.duration.symbol, "\u{f4e3} ");
-        assert_eq!(config.cwd.symbol, "\u{f413} ");
+        assert_eq!(config.cwd.symbol, "\u{f489} ");
         assert_eq!(config.project.symbol, "\u{f46d} ");
         assert_eq!(config.style.symbol, "\u{f48f} ");
     }
@@ -425,21 +425,21 @@ unknown_config = 123
     #[test]
     fn test_semantic_styles() {
         let config = BarConfig::default();
-        assert_eq!(config.model.style, "cyan");
+        assert_eq!(config.model.style, "magenta");
         assert_eq!(config.version.style, "dim");
         assert_eq!(config.tokens.style, "dim");
         assert_eq!(config.cache.style, "dim");
         assert_eq!(config.cost.style, "green");
-        assert_eq!(config.duration.style, "magenta");
-        assert_eq!(config.wall_time.style, "magenta");
-        assert_eq!(config.cwd.style, "blue");
+        assert_eq!(config.duration.style, "dim cyan");
+        assert_eq!(config.wall_time.style, "cyan");
+        assert_eq!(config.cwd.style, "dim blue");
         assert_eq!(config.project.style, "blue");
-        assert_eq!(config.style.style, "dim");
+        assert_eq!(config.style.style, "dim magenta");
         assert_eq!(config.project_today_cost.style, "blue");
-        assert_eq!(config.burn_rate.style, "cyan");
+        assert_eq!(config.burn_rate.style, "dim cyan");
         assert_eq!(config.spend_rate.style, "cyan");
-        assert_eq!(config.session_tok_per_dollar.style, "cyan");
-        assert_eq!(config.cost_vs_avg.style, "blue");
+        assert_eq!(config.session_tok_per_dollar.style, "dim cyan");
+        assert_eq!(config.cost_vs_avg.style, "dim blue");
         assert_eq!(config.cache_hit_rate.style, "cyan");
     }
 

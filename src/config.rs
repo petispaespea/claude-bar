@@ -50,11 +50,12 @@ pub const LINES_ICONS: Icons       = Icons { none: "",     oct: "\u{f4d2} ", fa:
 pub const DURATION_ICONS: Icons    = Icons { none: "api:", oct: "\u{f4e3} ", fa: "\u{f254} " };
 pub const WALL_TIME_ICONS: Icons   = Icons { none: "wall:", oct: "\u{f4e3} ", fa: "\u{f254} " };
 pub const GIT_BRANCH_ICONS: Icons  = Icons { none: "",      oct: "\u{f418} ", fa: "\u{f126} " };
-pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f413} ", fa: "\u{f114} " };
+pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f489} ", fa: "\u{f120} " };
 pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
 pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
 pub const ALERT_ICONS: Icons       = Icons { none: "",     oct: "\u{f421} ", fa: "\u{f071} " };
 pub const COST_VS_AVG_ICONS: Icons = Icons { none: "",     oct: "\u{f4a8} ", fa: "\u{f080} " };
+pub const BURN_RATE_ICONS: Icons  = Icons { none: "",     oct: "\u{f490} ", fa: "\u{f06d} " };
 
 const ALL_ELEMENTS: &[Element] = &[
     Element::Model,

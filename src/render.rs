@@ -1,5 +1,5 @@
 use crate::config::{
-    Element, IconMode, Icons, ALERT_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
+    Element, IconMode, Icons, ALERT_ICONS, BURN_RATE_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
     COST_VS_AVG_ICONS, CWD_ICONS, DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS,
     PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
@@ -344,13 +344,13 @@ fn render_project_today_cost(_input: &Input, mode: IconMode, config: &BarConfig,
 fn render_burn_rate(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
     let rate = agg_stats.as_ref()?.burn_rate?;
     render_element(&config.burn_rate.symbol, &config.burn_rate.style, mode,
-        &DURATION_ICONS, Some(format!("${rate:.2}/hr")))
+        &BURN_RATE_ICONS, Some(format!("${rate:.2}/hr")))
 }
 
 fn render_spend_rate(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {
     let rate = agg_stats.as_ref()?.spend_rate?;
     render_element(&config.spend_rate.symbol, &config.spend_rate.style, mode,
-        &DURATION_ICONS, Some(format!("${rate:.2}/hr")))
+        &COST_ICONS, Some(format!("${rate:.2}/hr")))
 }
 
 fn render_daily_budget(_input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &Option<AggregateStats>) -> Option<String> {

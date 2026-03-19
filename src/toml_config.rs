@@ -325,13 +325,16 @@ pub fn config_toml() -> String {
     let mut config = BarConfig::default();
     config.stats.enabled = true;
     let brk = crate::config::LINE_BREAK.to_string();
-    let elements: Vec<String> = [
-        "model", "style", "version", "context", "ctx_trend", "daily_budget", "cwd", "git_branch",
-    ].iter().map(|s| s.to_string())
+    let elements: Vec<String> =
+        ["project", "model", "version", "style", "git_branch", "cwd", "daily_budget"].iter().map(|s| s.to_string())
         .chain(std::iter::once(brk.clone()))
-        .chain(["cost", "lines", "duration", "burn_rate", "wall_time", "spend_rate", "tokens", "session_tok_per_dollar", "cache", "cache_hit_rate"].iter().map(|s| s.to_string()))
+        .chain(["context", "ctx_trend", "cost", "wall_time", "spend_rate", "duration", "burn_rate"].iter().map(|s| s.to_string()))
+        .chain(std::iter::once(brk.clone()))
+        .chain(["lines", "tokens", "session_tok_per_dollar", "cache", "cache_hit_rate"].iter().map(|s| s.to_string()))
+        .chain(std::iter::once(brk.clone()))
+        .chain(["project_today_cost", "cost_vs_avg", "avg_daily_cost"].iter().map(|s| s.to_string()))
         .chain(std::iter::once(brk))
-        .chain(["project", "project_today_cost", "cost_vs_avg", "avg_daily_cost", "alert"].iter().map(|s| s.to_string()))
+        .chain(["alert"].iter().map(|s| s.to_string()))
         .collect();
     config.layout.elements = elements;
     let body = toml::to_string_pretty(&config).unwrap();

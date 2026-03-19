@@ -204,10 +204,9 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
         "default" => vec![vec![
             Element::Model,
             Element::Context,
-            Element::Tokens,
+            Element::Cost,
             Element::Duration,
             Element::GitBranch,
-            Element::Cwd,
             Element::ProjectDir,
             Element::OutputStyle,
             Element::Alert,
@@ -348,7 +347,7 @@ pub fn print_info() {
 PRESETS
   minimal        model, context, alert
   compact        model, context, cost, cwd, alert
-  default        model, context, tokens, duration, git_branch, cwd, project, style, alert
+  default        model, context, cost, duration, git_branch, project, style, alert
   full           all elements (3 lines)
 
 ELEMENTS
@@ -529,13 +528,12 @@ mod tests {
         let lines = preset_elements("default").unwrap();
         assert_eq!(lines.len(), 1);
         let elements = &lines[0];
-        assert_eq!(elements.len(), 9);
+        assert_eq!(elements.len(), 8);
         assert!(elements.contains(&Element::Model));
         assert!(elements.contains(&Element::Context));
-        assert!(elements.contains(&Element::Tokens));
+        assert!(elements.contains(&Element::Cost));
         assert!(elements.contains(&Element::Duration));
         assert!(elements.contains(&Element::GitBranch));
-        assert!(elements.contains(&Element::Cwd));
         assert!(elements.contains(&Element::ProjectDir));
         assert!(elements.contains(&Element::OutputStyle));
         assert!(elements.contains(&Element::Alert));

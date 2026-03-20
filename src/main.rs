@@ -58,7 +58,7 @@ fn main() {
     let config = toml_config::load_config(cli.config.as_ref().map(|p| p.to_str().unwrap()));
     let toml_layout = config.as_ref().map(|c| c.layout.elements.as_slice());
     let elements = config::resolve_elements(&cli, toml_layout);
-    let icon_mode = config::resolve_icon_mode(&cli);
+    let icon_mode = config::resolve_icon_mode(&cli, config.as_ref().and_then(|c| c.icon_set.as_deref()));
     let config = config.unwrap_or_default();
 
     let input: input::Input = if cli.demo {

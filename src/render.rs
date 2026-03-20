@@ -326,7 +326,7 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &O
 
         if fires {
             let (bg, fg) = severity_style(&rule.severity);
-            let i = icon("", mode, &ALERT_ICONS);
+            let i = icon(rule.symbol.as_deref().unwrap_or(""), mode, &ALERT_ICONS);
             badges.push(format!("{i}{bg}{fg} {} {RST}", rule.display_label()));
         }
     }

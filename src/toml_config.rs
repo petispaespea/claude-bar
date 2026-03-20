@@ -11,6 +11,7 @@ macro_rules! module_config {
         #[derive(Debug, Clone, Deserialize, Serialize)]
         #[serde(default)]
         pub struct $name {
+            #[serde(skip_serializing)]
             pub symbol: String,
             pub style: String,
         }
@@ -48,6 +49,7 @@ module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim blue");
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct AvgDailyCostConfig {
+    #[serde(skip_serializing)]
     pub symbol: String,
     pub style: String,
     pub lookback_days: u64,
@@ -66,6 +68,7 @@ impl Default for AvgDailyCostConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct CtxTrendConfig {
+    #[serde(skip_serializing)]
     pub symbol: String,
     pub style: String,
     pub lookback_secs: u64,
@@ -84,6 +87,7 @@ impl Default for CtxTrendConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ContextConfig {
+    #[serde(skip_serializing)]
     pub symbol: String,
     pub style: String,
     pub bar_style: String,
@@ -121,6 +125,7 @@ impl Default for StatsConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct DailyBudgetConfig {
+    #[serde(skip_serializing)]
     pub symbol: String,
     pub style: String,
     pub bar_style: String,
@@ -153,6 +158,8 @@ pub struct AlertRule {
     pub severity: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
 }
 
 impl AlertRule {
@@ -171,6 +178,8 @@ impl AlertRule {
 #[serde(default)]
 pub struct BarConfig {
     pub separator: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_set: Option<String>,
     pub layout: LayoutConfig,
     pub stats: StatsConfig,
     pub model: ModelConfig,
@@ -204,6 +213,7 @@ impl Default for BarConfig {
     fn default() -> Self {
         Self {
             separator: " | ".into(),
+            icon_set: None,
             layout: Default::default(),
             stats: Default::default(),
             model: Default::default(),
@@ -234,12 +244,14 @@ impl Default for BarConfig {
                     label: None,
                     severity: "error".into(),
                     threshold: None,
+                    symbol: None,
                 },
                 AlertRule {
                     trigger: "cost_high".into(),
                     label: None,
                     severity: "error".into(),
                     threshold: None,
+                    symbol: None,
                 },
             ],
         }

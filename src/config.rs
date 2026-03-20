@@ -351,13 +351,15 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
     preset_elements("default").unwrap()
 }
 
-pub fn resolve_icon_mode(cli: &Cli) -> IconMode {
+pub fn resolve_icon_mode(cli: &Cli, toml_icon_set: Option<&str>) -> IconMode {
     if cli.no_icons {
         debug("icons: disabled via --no-icons");
         return IconMode::None;
     }
     let env_set = env("CLAUDE_BAR_ICON_SET");
-    let set = cli.icon_set.as_deref().or(env_set.as_deref());
+    let set = cli.icon_set.as_deref()
+        .or(env_set.as_deref())
+        .or(toml_icon_set);
     let mode = match set {
         Some("none" | "off") => IconMode::None,
         Some("fontawesome" | "fa") => IconMode::FontAwesome,
@@ -657,20 +659,20 @@ mod tests {
     fn test_resolve_icon_mode_no_icons_flag() {
         let mut cli = test_cli();
         cli.no_icons = true;
-        assert_eq!(resolve_icon_mode(&cli), IconMode::None);
+        assert_eq!(resolve_icon_mode(&cli, None), IconMode::None);
     }
 
     #[test]
     fn test_resolve_icon_mode_fontawesome() {
         let mut cli = test_cli();
         cli.icon_set = Some("fa".into());
-        assert_eq!(resolve_icon_mode(&cli), IconMode::FontAwesome);
+        assert_eq!(resolve_icon_mode(&cli, None), IconMode::FontAwesome);
     }
 
     #[test]
     fn test_resolve_icon_mode_octicons_default() {
         let cli = test_cli();
-        assert_eq!(resolve_icon_mode(&cli), IconMode::Octicons);
+        assert_eq!(resolve_icon_mode(&cli, None), IconMode::Octicons);
     }
 
     #[test]

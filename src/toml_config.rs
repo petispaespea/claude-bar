@@ -147,8 +147,8 @@ impl Default for DailyBudgetConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AlertRule {
     pub trigger: String,
-    #[serde(default = "AlertRule::default_label")]
-    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     #[serde(default = "AlertRule::default_severity")]
     pub severity: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -156,8 +156,15 @@ pub struct AlertRule {
 }
 
 impl AlertRule {
-    fn default_label() -> String { "CTX EXCEEDED".into() }
     fn default_severity() -> String { "error".into() }
+    pub fn display_label(&self) -> String {
+        self.label.clone().unwrap_or_else(|| match self.trigger.as_str() {
+            "ctx_exceeded" => "CTX EXCEEDED".into(),
+            "ctx_high" => "CTX HIGH".into(),
+            "cost_high" => "BUDGET EXCEEDED".into(),
+            other => other.to_uppercase().replace('_', " "),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -224,13 +231,13 @@ impl Default for BarConfig {
             alerts: vec![
                 AlertRule {
                     trigger: "ctx_exceeded".into(),
-                    label: "CTX EXCEEDED".into(),
+                    label: None,
                     severity: "error".into(),
                     threshold: None,
                 },
                 AlertRule {
                     trigger: "cost_high".into(),
-                    label: "BUDGET EXCEEDED".into(),
+                    label: None,
                     severity: "error".into(),
                     threshold: None,
                 },
@@ -336,6 +343,11 @@ pub fn config_toml() -> String {
         .collect();
     config.layout.elements = elements;
     let body = toml::to_string_pretty(&config).unwrap();
+    let alert_comment = "\
+# Specifying any [[alert]] replaces ALL defaults.\n\
+# label is optional — derived from trigger if omitted.\n\
+# cost_high requires [stats] enabled = true.\n";
+    let body = body.replace("[[alert]]", &format!("{alert_comment}[[alert]]"));
     format!("{header}\n{body}")
 }
 
@@ -575,8 +587,11 @@ show_pct = false
         assert_eq!(config.alerts[0].trigger, "ctx_exceeded");
         assert_eq!(config.alerts[0].severity, "error");
         assert!(config.alerts[0].threshold.is_none());
+        assert!(config.alerts[0].label.is_none());
+        assert_eq!(config.alerts[0].display_label(), "CTX EXCEEDED");
         assert_eq!(config.alerts[1].trigger, "cost_high");
-        assert_eq!(config.alerts[1].label, "BUDGET EXCEEDED");
+        assert!(config.alerts[1].label.is_none());
+        assert_eq!(config.alerts[1].display_label(), "BUDGET EXCEEDED");
     }
 
     #[test]
@@ -596,6 +611,7 @@ threshold = 90.0
         let config: BarConfig = toml::from_str(toml_str).expect("Should deserialize");
         assert_eq!(config.alerts.len(), 2);
         assert_eq!(config.alerts[0].trigger, "ctx_exceeded");
+        assert_eq!(config.alerts[0].label, Some("CTX EXCEEDED".into()));
         assert_eq!(config.alerts[1].trigger, "ctx_high");
         assert_eq!(config.alerts[1].threshold, Some(90.0));
     }

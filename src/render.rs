@@ -313,12 +313,15 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &O
             }
             "cost_high" => {
                 if let Some(stats) = agg_stats {
-                    stats.daily_budget_pct.is_some_and(|pct| pct >= 100.0)
+                    stats.daily_budget_pct.is_some_and(|pct| pct >= rule.threshold.unwrap_or(100.0))
                 } else {
                     false
                 }
             }
-            _ => false,
+            unknown => {
+                crate::config::debug(&format!("alert: unknown trigger '{unknown}', skipped"));
+                false
+            }
         };
 
         if fires {

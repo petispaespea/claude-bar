@@ -11,15 +11,40 @@ fn cmd() -> Command {
     c
 }
 
+fn run(args: &[&str]) -> Vec<u8> {
+    let out = cmd().args(args).output().unwrap();
+    assert!(out.status.success(), "non-zero exit for args: {args:?}");
+    out.stdout
+}
+
+fn run_stdin(stdin: &[u8]) -> Vec<u8> {
+    let out = cmd().write_stdin(stdin.to_vec()).output().unwrap();
+    assert!(out.status.success(), "non-zero exit for stdin input");
+    out.stdout
+}
+
+/// Regenerate all baseline files.  Run with:
+///   cargo test -p claude-bar --test cli regen_baselines -- --ignored
+#[test]
+#[ignore]
+fn regen_baselines() {
+    let dir = "tests/baselines";
+    fs::write(format!("{dir}/default.txt"), run(&["--demo"])).unwrap();
+    fs::write(format!("{dir}/minimal.txt"), run(&["--demo", "--preset", "minimal"])).unwrap();
+    fs::write(format!("{dir}/compact.txt"), run(&["--demo", "--preset", "compact"])).unwrap();
+    fs::write(format!("{dir}/full.txt"), run(&["--demo", "--preset", "full"])).unwrap();
+    fs::write(format!("{dir}/noicons.txt"), run(&["--demo", "--no-icons"])).unwrap();
+    fs::write(format!("{dir}/fa.txt"), run(&["--demo", "--icon-set", "fa"])).unwrap();
+    fs::write(format!("{dir}/custom.txt"), run(&["--demo", "--elements", "model,cost"])).unwrap();
+    let json = fs::read("demo-status.json").unwrap();
+    fs::write(format!("{dir}/demo-json.txt"), run_stdin(&json)).unwrap();
+    fs::write(format!("{dir}/empty-json.txt"), run_stdin(b"{}")).unwrap();
+    eprintln!("All baselines regenerated.");
+}
+
 #[test]
 fn demo_produces_output() {
-    let output = cmd()
-        .arg("--demo")
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    assert!(!output.stdout.is_empty());
+    assert!(!run(&["--demo"]).is_empty());
 }
 
 #[test]

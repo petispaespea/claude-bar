@@ -247,15 +247,13 @@ pub struct LayoutConfig {
 
 impl Default for LayoutConfig {
     fn default() -> Self {
-        Self {
-            elements: [
-                "model", "version", "context", "tokens", "cache",
-                "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
-            ]
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
-        }
+        let elements = crate::config::preset_elements("default")
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .map(|e| e.name().to_string())
+            .collect();
+        Self { elements }
     }
 }
 
@@ -395,8 +393,7 @@ unknown_config = 123
     fn test_default_layout_matches_all_elements_order() {
         let config = BarConfig::default();
         let expected = vec![
-            "model", "version", "context", "tokens", "cache", "cost", "lines", "duration",
-            "wall_time", "git_branch", "cwd", "project", "style", "alert",
+            "model", "context", "cost", "duration", "git_branch", "project", "style", "alert",
         ];
         assert_eq!(config.layout.elements, expected);
     }

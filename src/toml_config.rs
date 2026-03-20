@@ -420,7 +420,7 @@ unknown_config = 123
     fn test_default_layout_matches_all_elements_order() {
         let config = BarConfig::default();
         let expected = vec![
-            "model", "context", "cost", "duration", "git_branch", "project", "style", "alert",
+            "project", "model", "style", "git_branch", "context", "cost", "duration", "alert",
         ];
         assert_eq!(config.layout.elements, expected);
     }

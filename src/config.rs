@@ -225,39 +225,42 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
     Some(match name {
         "minimal" => vec![vec![Element::Model, Element::Context, Element::Alert]],
         "compact" => vec![vec![
+            Element::ProjectDir,
             Element::Model,
             Element::Context,
             Element::Cost,
-            Element::Cwd,
             Element::Alert,
         ]],
         "default" => vec![vec![
+            Element::ProjectDir,
             Element::Model,
+            Element::OutputStyle,
+            Element::GitBranch,
             Element::Context,
             Element::Cost,
             Element::Duration,
-            Element::GitBranch,
-            Element::ProjectDir,
-            Element::OutputStyle,
             Element::Alert,
         ]],
         "full" => vec![
             vec![
-                Element::Model, Element::Version, Element::Context,
-                Element::Tokens, Element::Cache, Element::Cost,
-                Element::Lines,
+                Element::ProjectDir, Element::Model, Element::Version,
+                Element::OutputStyle, Element::GitBranch, Element::Cwd,
+                Element::DailyBudget,
             ],
             vec![
-                Element::Duration, Element::WallTime, Element::GitBranch,
-                Element::Cwd, Element::ProjectDir, Element::OutputStyle,
-                Element::Alert,
+                Element::Context, Element::CtxTrend, Element::Cost,
+                Element::WallTime, Element::SpendRate, Element::Duration,
+                Element::BurnRate,
             ],
             vec![
-                Element::ProjectTodayCost, Element::BurnRate, Element::SpendRate,
-                Element::DailyBudget, Element::SessionTokPerDollar,
-                Element::CacheHitRate, Element::CostVsAvg, Element::CtxTrend,
+                Element::Lines, Element::Tokens, Element::SessionTokPerDollar,
+                Element::Cache, Element::CacheHitRate,
+            ],
+            vec![
+                Element::ProjectTodayCost, Element::CostVsAvg,
                 Element::AvgDailyCost,
             ],
+            vec![Element::Alert],
         ],
         _ => return None,
     })
@@ -378,9 +381,9 @@ pub fn print_info() {
         "\
 PRESETS
   minimal        model, context, alert
-  compact        model, context, cost, cwd, alert
-  default        model, context, cost, duration, git_branch, project, style, alert
-  full           all elements (3 lines)
+  compact        project, model, context, cost, alert
+  default        project, model, style, git_branch, context, cost, duration, alert
+  full           all elements (5 lines)
 
 ELEMENTS
   model          Model display name (e.g. Opus 4.6)
@@ -546,35 +549,29 @@ mod tests {
     fn test_preset_elements_compact() {
         let lines = preset_elements("compact").unwrap();
         assert_eq!(lines.len(), 1);
-        let elements = &lines[0];
-        assert_eq!(elements.len(), 5);
-        assert!(elements.contains(&Element::Model));
-        assert!(elements.contains(&Element::Context));
-        assert!(elements.contains(&Element::Cost));
-        assert!(elements.contains(&Element::Cwd));
-        assert!(elements.contains(&Element::Alert));
+        assert_eq!(
+            lines[0],
+            vec![Element::ProjectDir, Element::Model, Element::Context, Element::Cost, Element::Alert]
+        );
     }
 
     #[test]
     fn test_preset_elements_default() {
         let lines = preset_elements("default").unwrap();
         assert_eq!(lines.len(), 1);
-        let elements = &lines[0];
-        assert_eq!(elements.len(), 8);
-        assert!(elements.contains(&Element::Model));
-        assert!(elements.contains(&Element::Context));
-        assert!(elements.contains(&Element::Cost));
-        assert!(elements.contains(&Element::Duration));
-        assert!(elements.contains(&Element::GitBranch));
-        assert!(elements.contains(&Element::ProjectDir));
-        assert!(elements.contains(&Element::OutputStyle));
-        assert!(elements.contains(&Element::Alert));
+        assert_eq!(
+            lines[0],
+            vec![
+                Element::ProjectDir, Element::Model, Element::OutputStyle, Element::GitBranch,
+                Element::Context, Element::Cost, Element::Duration, Element::Alert,
+            ]
+        );
     }
 
     #[test]
     fn test_preset_elements_full() {
         let lines = preset_elements("full").unwrap();
-        assert_eq!(lines.len(), 3);
+        assert_eq!(lines.len(), 5);
         let all: Vec<Element> = lines.into_iter().flatten().collect();
         assert_eq!(all.len(), 23);
         for elem in ALL_ELEMENTS.iter() {

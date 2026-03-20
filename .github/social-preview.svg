@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640"
+     font-family="Symbols Nerd Font Mono, SF Mono, Menlo, Consolas, monospace">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#1a1b26"/>
@@ -30,94 +31,102 @@
   <rect width="1280" height="640" fill="url(#grid)"/>
 
   <!-- Title -->
-  <text x="640" y="120" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="58" font-weight="700" fill="#c0caf5" letter-spacing="-1">claude-bar</text>
+  <text x="640" y="100" text-anchor="middle" font-size="52" font-weight="700" fill="#c0caf5" letter-spacing="-1">claude-bar</text>
 
   <!-- Subtitle -->
-  <text x="640" y="162" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="20" fill="#565f89">A fast, configurable status line for Claude Code</text>
+  <text x="640" y="138" text-anchor="middle" font-size="18" fill="#565f89">A fast, configurable status line for Claude Code</text>
 
-  <!-- ==================== MINIMAL PRESET (34% green) ==================== -->
+  <!-- ==================== MINIMAL PRESET (30% green) ==================== -->
+  <!-- Elements: model, context, alert -->
   <g filter="url(#shadow)">
-    <rect x="120" y="200" width="1040" height="80" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
-    <!-- Title bar -->
-    <rect x="120" y="200" width="1040" height="32" rx="10" fill="#1e1e2e"/>
-    <rect x="120" y="222" width="1040" height="10" fill="#1e1e2e"/>
-    <!-- Traffic lights -->
-    <circle cx="148" cy="216" r="5.5" fill="#ff5f57"/>
-    <circle cx="168" cy="216" r="5.5" fill="#febc2e"/>
-    <circle cx="188" cy="216" r="5.5" fill="#28c840"/>
-    <!-- Terminal title -->
-    <text x="640" y="221" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#565f89">claude-bar --demo --preset minimal</text>
+    <rect x="120" y="155" width="1040" height="74" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <rect x="120" y="155" width="1040" height="30" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="175" width="1040" height="10" fill="#1e1e2e"/>
+    <circle cx="148" cy="170" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="170" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="170" r="5.5" fill="#28c840"/>
+    <text x="640" y="175" text-anchor="middle" font-size="12" fill="#565f89">claude-bar --demo --preset minimal</text>
   </g>
-  <!-- Status bar bg -->
-  <rect x="140" y="244" width="1000" height="26" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
-  <!-- minimal: model, gauge (34% green), context -->
-  <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="15">
-    <text x="158" y="262" fill="#7aa2f7" filter="url(#glow)">Opus 4.6</text>
-    <text x="252" y="262" fill="#9ece6a" font-size="16">⣿⣿⣿⡆</text>
-    <text x="322" y="262" fill="#3b3d52" font-size="16">⠀⠀⠀⠀⠀⠀</text>
-    <text x="432" y="262" fill="#9ece6a">34%</text>
+  <rect x="140" y="197" width="1000" height="24" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <g font-size="14">
+    <text x="148" y="214" fill="#7aa2f7" filter="url(#glow)">&#xF4BE; Opus 4.6</text>
+    <text x="247" y="214" fill="#9ece6a" font-size="15">&#xF4ED; ⣿⣿⣿</text>
+    <text x="290" y="214" fill="#3b3d52" font-size="15">⠀⠀⠀⠀⠀⠀⠀</text>
+    <text x="369" y="214" fill="#9ece6a">30%</text>
   </g>
 
-  <!-- ==================== COMPACT PRESET (62% yellow) ==================== -->
+  <!-- ==================== COMPACT PRESET (45% green) ==================== -->
+  <!-- Elements: project, model, context, cost, alert -->
   <g filter="url(#shadow)">
-    <rect x="120" y="310" width="1040" height="80" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
-    <!-- Title bar -->
-    <rect x="120" y="310" width="1040" height="32" rx="10" fill="#1e1e2e"/>
-    <rect x="120" y="332" width="1040" height="10" fill="#1e1e2e"/>
-    <!-- Traffic lights -->
-    <circle cx="148" cy="326" r="5.5" fill="#ff5f57"/>
-    <circle cx="168" cy="326" r="5.5" fill="#febc2e"/>
-    <circle cx="188" cy="326" r="5.5" fill="#28c840"/>
-    <!-- Terminal title -->
-    <text x="640" y="331" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#565f89">claude-bar --demo --preset compact</text>
+    <rect x="120" y="244" width="1040" height="74" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <rect x="120" y="244" width="1040" height="30" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="264" width="1040" height="10" fill="#1e1e2e"/>
+    <circle cx="148" cy="259" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="259" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="259" r="5.5" fill="#28c840"/>
+    <text x="640" y="264" text-anchor="middle" font-size="12" fill="#565f89">claude-bar --demo --preset compact</text>
   </g>
-  <!-- Status bar bg -->
-  <rect x="140" y="354" width="1000" height="26" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
-  <!-- compact: model, gauge (62% yellow), context, cost, cwd -->
-  <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="15">
-    <text x="158" y="372" fill="#7aa2f7" filter="url(#glow)">Opus 4.6</text>
-    <text x="252" y="372" fill="#e0af68" font-size="16">⣿⣿⣿⣿⣿⣿⡄</text>
-    <text x="382" y="372" fill="#3b3d52" font-size="16">⠀⠀⠀</text>
-    <text x="432" y="372" fill="#e0af68">62%</text>
-    <text x="486" y="372" fill="#565f89">$5.24</text>
-    <text x="552" y="372" fill="#565f89">…/my-project</text>
+  <rect x="140" y="286" width="1000" height="24" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <g font-size="14">
+    <text x="148" y="303" fill="#7aa2f7">&#xF46D; …/my-project</text>
+    <text x="289" y="303" fill="#7aa2f7" filter="url(#glow)">&#xF4BE; Opus 4.6</text>
+    <text x="388" y="303" fill="#9ece6a" font-size="15">&#xF4ED; ⣿⣿⣿⣿⡀</text>
+    <text x="449" y="303" fill="#3b3d52" font-size="15">⠀⠀⠀⠀⠀</text>
+    <text x="510" y="303" fill="#9ece6a">45%</text>
+    <text x="551" y="303" fill="#565f89">&#xF439; $5.24</text>
   </g>
 
-  <!-- ==================== FULL PRESET (87% red) ==================== -->
+  <!-- ==================== DEFAULT PRESET (62% yellow) ==================== -->
+  <!-- Elements: project, model, style(hidden), git_branch, context, cost, duration, alert -->
   <g filter="url(#shadow)">
-    <rect x="120" y="420" width="1040" height="80" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
-    <!-- Title bar -->
-    <rect x="120" y="420" width="1040" height="32" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="333" width="1040" height="74" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <rect x="120" y="333" width="1040" height="30" rx="10" fill="#1e1e2e"/>
+    <rect x="120" y="353" width="1040" height="10" fill="#1e1e2e"/>
+    <circle cx="148" cy="348" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="348" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="348" r="5.5" fill="#28c840"/>
+    <text x="640" y="353" text-anchor="middle" font-size="12" fill="#565f89">claude-bar --demo --preset default</text>
+  </g>
+  <rect x="140" y="375" width="1000" height="24" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <g font-size="14">
+    <text x="148" y="392" fill="#7aa2f7">&#xF46D; …/my-project</text>
+    <text x="289" y="392" fill="#7aa2f7" filter="url(#glow)">&#xF4BE; Opus 4.6</text>
+    <text x="388" y="392" fill="#bb9af7">&#xF418; main</text>
+    <text x="454" y="392" fill="#e0af68" font-size="15">&#xF4ED; ⣿⣿⣿⣿⣿⣿⡄</text>
+    <text x="533" y="392" fill="#3b3d52" font-size="15">⠀⠀⠀</text>
+    <text x="560" y="392" fill="#e0af68">62%</text>
+    <text x="601" y="392" fill="#565f89">&#xF439; $5.24</text>
+    <text x="675" y="392" fill="#565f89">&#xF4E3; 10m</text>
+  </g>
+
+  <!-- ==================== FULL PRESET line 1 (87% red) ==================== -->
+  <!-- Line 1: project, model, version, style(hidden), git_branch, cwd, daily_budget -->
+  <g filter="url(#shadow)">
+    <rect x="120" y="422" width="1040" height="74" rx="10" fill="#16161e" stroke="#2a2b3d" stroke-width="1"/>
+    <rect x="120" y="422" width="1040" height="30" rx="10" fill="#1e1e2e"/>
     <rect x="120" y="442" width="1040" height="10" fill="#1e1e2e"/>
-    <!-- Traffic lights -->
-    <circle cx="148" cy="436" r="5.5" fill="#ff5f57"/>
-    <circle cx="168" cy="436" r="5.5" fill="#febc2e"/>
-    <circle cx="188" cy="436" r="5.5" fill="#28c840"/>
-    <!-- Terminal title -->
-    <text x="640" y="441" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="12" fill="#565f89">claude-bar --demo --preset full</text>
+    <circle cx="148" cy="437" r="5.5" fill="#ff5f57"/>
+    <circle cx="168" cy="437" r="5.5" fill="#febc2e"/>
+    <circle cx="188" cy="437" r="5.5" fill="#28c840"/>
+    <text x="640" y="442" text-anchor="middle" font-size="12" fill="#565f89">claude-bar --demo --preset full</text>
   </g>
-  <!-- Status bar bg -->
-  <rect x="140" y="464" width="1000" height="26" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
-  <!-- full: model, version, gauge (87% red), context, cost, lines, duration, cwd, project -->
-  <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="15">
-    <text x="158" y="482" fill="#7aa2f7" filter="url(#glow)">Opus 4.6</text>
-    <text x="252" y="482" fill="#565f89">v2.1.63</text>
-    <text x="330" y="482" fill="#f7768e" font-size="16">⣿⣿⣿⣿⣿⣿⣿⣿⣷</text>
-    <text x="498" y="482" fill="#3b3d52" font-size="16">⠀</text>
-    <text x="516" y="482" fill="#f7768e">87%</text>
-    <text x="566" y="482" fill="#565f89">$5.24</text>
-    <text x="630" y="482" fill="#9ece6a">+245</text>
-    <text x="678" y="482" fill="#565f89">/</text>
-    <text x="688" y="482" fill="#f7768e">-9</text>
-    <text x="722" y="482" fill="#565f89">10m</text>
-    <text x="768" y="482" fill="#565f89">…/my-project</text>
-    <text x="904" y="482" fill="#565f89">…/my-project</text>
+  <rect x="140" y="464" width="1000" height="24" rx="4" fill="url(#bar-bg)" stroke="#2f3146" stroke-width="0.5"/>
+  <g font-size="14">
+    <text x="148" y="481" fill="#7aa2f7">&#xF46D; …/my-project</text>
+    <text x="289" y="481" fill="#7aa2f7" filter="url(#glow)">&#xF4BE; Opus 4.6</text>
+    <text x="388" y="481" fill="#565f89">&#xF412; v2.1.63</text>
+    <text x="479" y="481" fill="#bb9af7">&#xF418; main</text>
+    <text x="545" y="481" fill="#565f89">&#xF489; …/my-project</text>
+    <text x="686" y="481" fill="#565f89">&#xF439; $52/$100</text>
+    <text x="786" y="481" fill="#e0af68">▰▰▰▰</text>
+    <text x="822" y="481" fill="#3b3d52">▱▱▱▱</text>
+    <text x="858" y="481" fill="#e0af68">52%</text>
   </g>
 
   <!-- Rust badge -->
-  <rect x="553" y="530" width="174" height="30" rx="15" fill="#1a1b26" stroke="#2f3146" stroke-width="1"/>
-  <text x="640" y="550" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="13" fill="#f7768e">written in Rust 🦀</text>
+  <rect x="553" y="527" width="174" height="30" rx="15" fill="#1a1b26" stroke="#2f3146" stroke-width="1"/>
+  <text x="640" y="547" text-anchor="middle" font-size="13" fill="#f7768e">written in Rust 🦀</text>
 
   <!-- Performance badge -->
-  <text x="640" y="595" text-anchor="middle" font-family="SF Mono, Menlo, Consolas, monospace" font-size="14" fill="#3b3d52">~3ms startup · Nerd Font icons · ANSI colors</text>
+  <text x="640" y="592" text-anchor="middle" font-size="14" fill="#3b3d52">~3ms startup · Nerd Font icons · ANSI colors</text>
 </svg>

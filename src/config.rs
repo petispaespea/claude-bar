@@ -57,6 +57,36 @@ pub const ALERT_ICONS: Icons       = Icons { none: "",     oct: "\u{f421} ", fa:
 pub const COST_VS_AVG_ICONS: Icons = Icons { none: "",     oct: "\u{f4a8} ", fa: "\u{f080} " };
 pub const BURN_RATE_ICONS: Icons  = Icons { none: "",     oct: "\u{f490} ", fa: "\u{f06d} " };
 
+impl Element {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Element::Model => "model",
+            Element::Version => "version",
+            Element::Context => "context",
+            Element::Tokens => "tokens",
+            Element::Cache => "cache",
+            Element::Cost => "cost",
+            Element::Lines => "lines",
+            Element::Duration => "duration",
+            Element::WallTime => "wall_time",
+            Element::GitBranch => "git_branch",
+            Element::Cwd => "cwd",
+            Element::ProjectDir => "project",
+            Element::OutputStyle => "style",
+            Element::Alert => "alert",
+            Element::ProjectTodayCost => "project_today_cost",
+            Element::BurnRate => "burn_rate",
+            Element::SpendRate => "spend_rate",
+            Element::DailyBudget => "daily_budget",
+            Element::SessionTokPerDollar => "session_tok_per_dollar",
+            Element::CacheHitRate => "cache_hit_rate",
+            Element::CostVsAvg => "cost_vs_avg",
+            Element::CtxTrend => "ctx_trend",
+            Element::AvgDailyCost => "avg_daily_cost",
+        }
+    }
+}
+
 const ALL_ELEMENTS: &[Element] = &[
     Element::Model,
     Element::Version,
@@ -650,6 +680,17 @@ mod tests {
                 parse_element(name),
                 Some(*elem),
                 "ALL_ELEMENT_NAMES entry '{name}' does not parse to matching ALL_ELEMENTS entry"
+            );
+        }
+    }
+
+    #[test]
+    fn test_element_name_matches_all_element_names() {
+        for (elem, name) in ALL_ELEMENTS.iter().zip(ALL_ELEMENT_NAMES.iter()) {
+            assert_eq!(
+                elem.name(),
+                *name,
+                "Element::name() for {elem:?} does not match ALL_ELEMENT_NAMES entry '{name}'"
             );
         }
     }

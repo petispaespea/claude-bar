@@ -41,9 +41,9 @@ All settings can be passed as CLI flags or set via env vars in `~/.claude/settin
 | Preset    | Elements                                                        |
 |-----------|-----------------------------------------------------------------|
 | `minimal` | model, context, alert                                           |
-| `compact` | model, context, cost, cwd, alert                                |
-| `default` | model, context, tokens, duration, cwd, project, style, alert    |
-| `full`    | all elements (3 lines)                                          |
+| `compact` | project, model, context, cost, alert                            |
+| `default` | project, model, style, git_branch, context, cost, duration, alert |
+| `full`    | all elements (5 lines)                                          |
 
 Set via `--preset` flag or `CLAUDE_BAR` env var:
 
@@ -127,11 +127,49 @@ Per-element fields:
 - `symbol` (string): icon or text prefix
 - `style` (string): space-separated style names
 
-The `context` element also supports `bar_style` (`braille`, `block`, `shade`, `ascii`), `width`, `show_bar`, and `show_pct`.
+The `context` element also supports `bar_style` (`braille`, `block`, `shade`, `ascii`, `progress`), `width`, `show_bar`, and `show_pct`.
 
 Style vocabulary: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `bold`, `dim`, `italic`, `underline`. Example: `style = "bold red"`.
 
 The `context` and `lines` elements default to empty style and use dynamic color based on runtime values.
+
+### Additional TOML options
+
+**Top-level:**
+
+- `icon_set` (string): overrides icon set globally — see [Icon sets](#icon-sets) table above
+
+**`[stats]` section:**
+
+- `enabled` (bool, default `false`): enable stats collection and stats elements
+- `day_window` (string): `"calendar"` (midnight boundary) or `"rolling"` (24 h rolling)
+
+**`[daily_budget]`:**
+
+- `bar_style`, `width`, `show_bar`, `show_pct`: same as `[context]`
+- `limit` (float, default `100.0`): daily budget in USD
+
+**`[ctx_trend]`:**
+
+- `lookback_secs` (integer, default `300`): how far back to look when computing context trend
+
+**`[avg_daily_cost]`:**
+
+- `lookback_days` (integer, default `30`): number of days averaged for the `avg_daily_cost` element
+
+**`[[alert]]` array (replaces all defaults when specified):**
+
+- `trigger` (string): `ctx_exceeded`, `ctx_high`, `cost_high`
+- `label` (string, optional): badge text — derived from trigger name if omitted
+- `severity` (string, default `"error"`): `"error"` (red) or `"warn"` (yellow)
+- `threshold` (float, optional): percentage threshold for `ctx_high`; budget threshold for `cost_high`
+- `symbol` (string, optional): override the badge icon
+
+Default alerts (active unless overridden): `ctx_exceeded` (error) and `cost_high` (error).
+
+### Debug output
+
+Set `CLAUDE_BAR_DEBUG=1` to print diagnostic messages to stderr — useful for troubleshooting config loading, element resolution, and icon selection.
 
 ## Elements
 
@@ -148,6 +186,7 @@ The `context` and `lines` elements default to empty style and use dynamic color 
 | `lines`                    | Lines added/removed                        |
 | `duration`, `time`         | API wait time                              |
 | `wall_time`, `wall`, `elapsed` | Wall clock elapsed time                |
+| `git_branch`, `branch`, `git` | Git branch name (reads .git/HEAD)       |
 | `cwd`                      | Working directory (shortened)              |
 | `project`, `project_dir`   | Project root (shortened)                   |
 | `style`, `output_style`    | Output style (hidden when "default")       |
@@ -165,13 +204,13 @@ These require `[stats] enabled = true` in the TOML config:
 
 | Name            | Description                              |
 |-----------------|------------------------------------------|
-| `project_daily_cost` | Today's spend for current project (alias: `daily_cost`) |
+| `project_today_cost` | Today's spend for current project (alias: `daily_cost`) |
 | `burn_rate`     | Cost per hour (API duration)             |
 | `spend_rate`    | Cost per hour (wall clock)               |
-| `session_count` | Number of sessions today                 |
 | `daily_budget`  | Daily spend limit with progress bar      |
-| `tok_per_dollar`| Output tokens per dollar                 |
-| `cost_vs_avg`   | Current session cost vs historical avg   |
+| `session_tok_per_dollar` | Output tokens per dollar        |
+| `avg_daily_cost` | Average daily spend for current project (configurable lookback) |
+| `cost_vs_avg`   | Current project cost vs other projects today |
 | `ctx_trend`     | Context usage direction over last 10 renders |
 
 ## CLI reference

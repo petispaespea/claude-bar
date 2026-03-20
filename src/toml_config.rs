@@ -165,12 +165,15 @@ pub struct AlertRule {
 impl AlertRule {
     fn default_severity() -> String { "error".into() }
     pub fn display_label(&self) -> String {
-        self.label.clone().unwrap_or_else(|| match self.trigger.as_str() {
-            "ctx_exceeded" => "CTX EXCEEDED".into(),
-            "ctx_high" => "CTX HIGH".into(),
-            "cost_high" => "BUDGET EXCEEDED".into(),
-            other => other.to_uppercase().replace('_', " "),
-        })
+        match self.label.as_deref() {
+            Some(s) => s.to_string(),
+            None => match self.trigger.as_str() {
+                "ctx_exceeded" => "CTX EXCEEDED".into(),
+                "ctx_high" => "CTX HIGH".into(),
+                "cost_high" => "BUDGET EXCEEDED".into(),
+                other => other.to_uppercase().replace('_', " "),
+            },
+        }
     }
 }
 

@@ -25,6 +25,7 @@ pub enum Element {
     CostVsAvg,
     CtxTrend,
     AvgDailyCost,
+    SessionId,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -53,6 +54,7 @@ pub const GIT_BRANCH_ICONS: Icons  = Icons { none: "",      oct: "\u{f418} ", fa
 pub const CWD_ICONS: Icons         = Icons { none: "cwd:", oct: "\u{f489} ", fa: "\u{f120} " };
 pub const PROJECT_ICONS: Icons     = Icons { none: "proj:", oct: "\u{f46d} ", fa: "\u{f015} " };
 pub const STYLE_ICONS: Icons       = Icons { none: "",     oct: "\u{f48f} ", fa: "\u{f1fc} " };
+pub const SESSION_ID_ICONS: Icons  = Icons { none: "",     oct: "\u{f4ff} ", fa: "\u{f2c2} " };
 pub const ALERT_ICONS: Icons       = Icons { none: "",     oct: "\u{f421} ", fa: "\u{f071} " };
 pub const COST_VS_AVG_ICONS: Icons = Icons { none: "",     oct: "\u{f4a8} ", fa: "\u{f080} " };
 pub const BURN_RATE_ICONS: Icons  = Icons { none: "",     oct: "\u{f490} ", fa: "\u{f06d} " };
@@ -83,6 +85,7 @@ impl Element {
             Element::CostVsAvg => "cost_vs_avg",
             Element::CtxTrend => "ctx_trend",
             Element::AvgDailyCost => "avg_daily_cost",
+            Element::SessionId => "session_id",
         }
     }
 }
@@ -102,6 +105,7 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::ProjectDir,
     Element::OutputStyle,
     Element::Alert,
+    Element::SessionId,
     Element::ProjectTodayCost,
     Element::BurnRate,
     Element::SpendRate,
@@ -116,6 +120,7 @@ const ALL_ELEMENTS: &[Element] = &[
 pub const CORE_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
     "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
+    "session_id",
 ];
 
 pub const STATS_ELEMENT_NAMES: &[&str] = &[
@@ -127,6 +132,7 @@ pub const STATS_ELEMENT_NAMES: &[&str] = &[
 pub const ALL_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
     "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
+    "session_id",
     "project_today_cost", "burn_rate", "spend_rate",
     "daily_budget", "session_tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
     "avg_daily_cost",
@@ -245,7 +251,7 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
             vec![
                 Element::ProjectDir, Element::Model, Element::Version,
                 Element::OutputStyle, Element::GitBranch, Element::Cwd,
-                Element::DailyBudget,
+                Element::DailyBudget, Element::SessionId,
             ],
             vec![
                 Element::Context, Element::CtxTrend, Element::Cost,
@@ -291,6 +297,7 @@ fn parse_element(s: &str) -> Option<Element> {
         "cost_vs_avg" => Some(Element::CostVsAvg),
         "ctx_trend" => Some(Element::CtxTrend),
         "avg_daily_cost" => Some(Element::AvgDailyCost),
+        "session_id" | "session" => Some(Element::SessionId),
         _ => None,
     }
 }
@@ -404,6 +411,8 @@ ELEMENTS
   style,         Output style (hidden when \"default\")
     output_style
   alert          Conditional badges (ctx exceeded, ctx high, budget)
+  session_id,    Session identifier (first 8 characters)
+    session
 
 STATS ELEMENTS (require [stats] enabled = true)
   project_today_cost  Today's spend for current project (alias: daily_cost)
@@ -573,7 +582,7 @@ mod tests {
         let lines = preset_elements("full").unwrap();
         assert_eq!(lines.len(), 5);
         let all: Vec<Element> = lines.into_iter().flatten().collect();
-        assert_eq!(all.len(), 23);
+        assert_eq!(all.len(), 24);
         for elem in ALL_ELEMENTS.iter() {
             assert!(all.contains(elem));
         }

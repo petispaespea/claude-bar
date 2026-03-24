@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::{
     debug, env, BURN_RATE_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS, COST_VS_AVG_ICONS,
     CWD_ICONS, DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS, PROJECT_ICONS,
-    STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
+    STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS, SESSION_ID_ICONS,
 };
 
 macro_rules! module_config {
@@ -45,6 +45,7 @@ module_config!(SpendRateConfig,   COST_ICONS,   "cyan");
 module_config!(SessionTokPerDollarConfig, TOKENS_ICONS,     "dim cyan");
 module_config!(CacheHitRateConfig, CACHE_ICONS,      "cyan");
 module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim blue");
+module_config!(SessionIdConfig,   SESSION_ID_ICONS, "dim");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -206,6 +207,7 @@ pub struct BarConfig {
     pub session_tok_per_dollar: SessionTokPerDollarConfig,
     pub cache_hit_rate: CacheHitRateConfig,
     pub cost_vs_avg: CostVsAvgConfig,
+    pub session_id: SessionIdConfig,
     pub avg_daily_cost: AvgDailyCostConfig,
     pub ctx_trend: CtxTrendConfig,
     #[serde(rename = "alert")]
@@ -239,6 +241,7 @@ impl Default for BarConfig {
             session_tok_per_dollar: Default::default(),
             cache_hit_rate: Default::default(),
             cost_vs_avg: Default::default(),
+            session_id: Default::default(),
             avg_daily_cost: Default::default(),
             ctx_trend: Default::default(),
             alerts: vec![
@@ -346,7 +349,7 @@ pub fn config_toml() -> String {
     config.stats.enabled = true;
     let brk = crate::config::LINE_BREAK.to_string();
     let elements: Vec<String> =
-        ["project", "model", "version", "style", "git_branch", "cwd", "daily_budget"].iter().map(|s| s.to_string())
+        ["project", "model", "version", "style", "git_branch", "cwd", "daily_budget", "session_id"].iter().map(|s| s.to_string())
         .chain(std::iter::once(brk.clone()))
         .chain(["context", "ctx_trend", "cost", "wall_time", "spend_rate", "duration", "burn_rate"].iter().map(|s| s.to_string()))
         .chain(std::iter::once(brk.clone()))

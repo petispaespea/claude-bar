@@ -1,7 +1,7 @@
 use crate::config::{
     Element, IconMode, Icons, ALERT_ICONS, BURN_RATE_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
     COST_VS_AVG_ICONS, CWD_ICONS, DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS,
-    PROJECT_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
+    PROJECT_ICONS, SESSION_ID_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
 use crate::format::{format_duration, format_tokens, shorten_path};
 use crate::input::Input;
@@ -288,6 +288,13 @@ fn render_output_style(input: &Input, mode: IconMode, config: &BarConfig) -> Opt
         &STYLE_ICONS, Some(format!("[{name}]")))
 }
 
+fn render_session_id(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let sid = input.session_id.as_ref()?;
+    let short = &sid[..sid.len().min(8)];
+    render_element(&config.session_id.symbol, &config.session_id.style, mode,
+        &SESSION_ID_ICONS, Some(short.to_string()))
+}
+
 fn severity_style(severity: &str) -> (&'static str, &'static str) {
     match severity {
         "warn" => (BG_YELLOW, BLACK),
@@ -435,6 +442,7 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::Cwd => render_cwd(input, mode, config),
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),
+        Element::SessionId => render_session_id(input, mode, config),
         Element::Alert => render_alert(input, mode, config, agg_stats),
         Element::ProjectTodayCost => render_project_today_cost(input, mode, config, agg_stats),
         Element::BurnRate => render_burn_rate(input, mode, config, agg_stats),

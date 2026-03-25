@@ -84,10 +84,10 @@ fn main() {
         }
     };
 
-    if input.git_branch.is_none() {
-        if let Some(ref cwd) = input.cwd {
-            input.git_branch = git::branch(cwd);
-        }
+    if input.git_branch.is_none()
+        && let Some(ref cwd) = input.cwd
+    {
+        input.git_branch = git::branch(cwd);
     }
 
     if config.stats.enabled && !cli.demo {

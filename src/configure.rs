@@ -254,18 +254,28 @@ impl App {
         let icon_set_str = ICON_SET_NAMES[self.icon_set_idx];
         let bar_style_str = BAR_STYLE_NAMES[self.bar_style_idx];
 
-        let mut config = BarConfig::default();
-        config.separator = self.separator.clone();
-        config.icon_set = if self.icon_set_idx == 0 {
-            None
-        } else {
-            Some(icon_set_str.to_string())
-        };
-        config.layout.elements = layout_elements;
-        config.context.bar_style = bar_style_str.to_string();
-        config.stats.enabled = self.stats_enabled;
-        config.daily_budget.limit = self.budget_text.parse::<f64>().unwrap_or(100.0);
-        config
+        BarConfig {
+            separator: self.separator.clone(),
+            icon_set: if self.icon_set_idx == 0 {
+                None
+            } else {
+                Some(icon_set_str.to_string())
+            },
+            layout: toml_config::LayoutConfig { elements: layout_elements },
+            context: toml_config::ContextConfig {
+                bar_style: bar_style_str.to_string(),
+                ..Default::default()
+            },
+            stats: toml_config::StatsConfig {
+                enabled: self.stats_enabled,
+                ..Default::default()
+            },
+            daily_budget: toml_config::DailyBudgetConfig {
+                limit: self.budget_text.parse::<f64>().unwrap_or(100.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     fn rebuild_preview(&mut self) {

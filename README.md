@@ -25,14 +25,6 @@ cargo build --release
 
 The `--setup` flag adds the `statusLine` entry to `~/.claude/settings.json`. Restart Claude Code to see it.
 
-### Interactive configuration
-
-```bash
-claude-bar --configure
-```
-
-Opens a TUI where you can build your bar layout visually — add, remove, and reorder elements with live preview. Settings like icon set, separator, and bar style are adjustable in a side panel. Saves directly to `~/.config/claude-bar.toml`.
-
 Preview without running Claude Code:
 
 ```bash
@@ -40,9 +32,17 @@ claude-bar --demo
 claude-bar --demo --preset full
 ```
 
-## Configuration
+## Configure
 
 All settings can be passed as CLI flags or set via env vars in `~/.claude/settings.json`. CLI flags take priority over env vars, which take priority over the TOML config, which falls back to the `default` preset.
+
+### Interactive TUI
+
+```bash
+claude-bar --configure
+```
+
+Build your bar layout visually — add, remove, and reorder elements with live preview. Settings like icon set, separator, and bar style are adjustable in a side panel. Saves directly to `~/.config/claude-bar.toml`.
 
 ### Presets
 
@@ -102,7 +102,7 @@ elements = ["model", "context", "tokens", "---", "cost", "duration", "wall_time"
 | Font Awesome  | `--icon-set fa` or `CLAUDE_BAR_ICON_SET=fa`             |
 | None          | `--no-icons` or `CLAUDE_BAR_ICON_SET=none`              |
 
-## TOML configuration
+## TOML reference
 
 Configuration can also be supplied via a TOML file. The path resolution follows this precedence:
 
@@ -135,13 +135,13 @@ Per-element fields:
 - `symbol` (string): icon or text prefix
 - `style` (string): space-separated style names
 
-The `context` element also supports `bar_style` (`braille`, `block`, `shade`, `ascii`, `progress`), `width`, `show_bar`, and `show_pct`.
-
 Style vocabulary: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `bold`, `dim`, `italic`, `underline`. Example: `style = "bold red"`.
+
+The `context` element also supports `bar_style` (`braille`, `block`, `shade`, `ascii`, `progress`), `width`, `show_bar`, and `show_pct`.
 
 The `context` and `lines` elements default to empty style and use dynamic color based on runtime values.
 
-### Additional TOML options
+### Additional options
 
 **Top-level:**
 

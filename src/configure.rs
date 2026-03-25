@@ -374,10 +374,19 @@ impl App {
             return;
         }
 
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s') {
-            self.saved = true;
-            self.should_quit = true;
-            return;
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char('s') => {
+                    self.saved = true;
+                    self.should_quit = true;
+                    return;
+                }
+                KeyCode::Char('c') => {
+                    self.should_quit = true;
+                    return;
+                }
+                _ => {}
+            }
         }
 
         if self.confirm_quit {
@@ -879,11 +888,11 @@ impl App {
         let help = if self.picker.is_some() {
             "↑↓:navigate  Enter:add  Esc:cancel"
         } else if self.is_editing() {
-            "Type: edit  Enter/Tab: confirm  Esc: revert  ^S: save  q: quit"
+            "Type: edit  Enter/Tab: confirm  Esc: revert  ^S:save  ^C/q:quit"
         } else {
             match self.focus {
-                Focus::BarList => "a:add  d/⌫:del  Shift+↑↓:move  b:break  Tab:settings  ^S:save  q:quit",
-                Focus::Settings => "↑↓:navigate  ←→:cycle  Space:toggle  Tab:bar list  ^S:save  Esc:back",
+                Focus::BarList => "a:add  d/⌫:del  Shift+↑↓:move  b:break  Tab:settings  ^S:save  ^C/q:quit",
+                Focus::Settings => "↑↓:navigate  ←→:cycle  Space:toggle  Tab:bar list  ^S:save  ^C/q:quit  Esc:back",
             }
         };
         frame.render_widget(

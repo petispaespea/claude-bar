@@ -1,5 +1,5 @@
 use crate::config::{
-    Element, IconMode, Icons, ALERT_ICONS, BURN_RATE_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
+    BarItem, Element, IconMode, Icons, ALERT_ICONS, BURN_RATE_ICONS, CACHE_ICONS, CONTEXT_ICONS, COST_ICONS,
     COST_VS_AVG_ICONS, CWD_ICONS, DURATION_ICONS, GIT_BRANCH_ICONS, LINES_ICONS, MODEL_ICONS,
     PROJECT_ICONS, SESSION_ID_ICONS, STYLE_ICONS, TOKENS_ICONS, VERSION_ICONS, WALL_TIME_ICONS,
 };
@@ -263,10 +263,9 @@ fn render_wall_time(input: &Input, mode: IconMode, config: &BarConfig) -> Option
 }
 
 fn render_git_branch(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
-    let dir = input.cwd.as_ref()?;
-    let branch = crate::git::branch(dir)?;
+    let branch = input.git_branch.as_ref()?;
     render_element(&config.git_branch.symbol, &config.git_branch.style, mode,
-        &GIT_BRANCH_ICONS, Some(branch))
+        &GIT_BRANCH_ICONS, Some(branch.to_string()))
 }
 
 fn render_cwd(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
@@ -454,4 +453,27 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::CtxTrend => render_ctx_trend(input, mode, config, agg_stats),
         Element::AvgDailyCost => render_avg_daily_cost(input, mode, config, agg_stats),
     }
+}
+
+pub fn render_all(
+    elements: &[Vec<BarItem>],
+    input: &Input,
+    mode: IconMode,
+    config: &BarConfig,
+    agg_stats: &Option<AggregateStats>,
+) -> String {
+    elements
+        .iter()
+        .map(|line| {
+            line.iter()
+                .filter_map(|item| match item {
+                    BarItem::Element(e) => render(*e, input, mode, config, agg_stats),
+                    BarItem::LineBreak => None,
+                })
+                .collect::<Vec<_>>()
+                .join(&config.separator)
+        })
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }

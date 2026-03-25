@@ -1,4 +1,5 @@
 mod config;
+mod configure;
 mod format;
 mod git;
 mod input;
@@ -34,6 +35,11 @@ fn main() {
         return;
     }
 
+    if cli.configure {
+        configure::run();
+        return;
+    }
+
     if cli.info {
         config::print_info();
         return;
@@ -58,10 +64,14 @@ fn main() {
     let config = toml_config::load_config(cli.config.as_ref().map(|p| p.to_str().unwrap()));
     let toml_layout = config.as_ref().map(|c| c.layout.elements.as_slice());
     let elements = config::resolve_elements(&cli, toml_layout);
+    let bar_lines: Vec<Vec<config::BarItem>> = elements
+        .into_iter()
+        .map(|line| line.into_iter().map(config::BarItem::Element).collect())
+        .collect();
     let icon_mode = config::resolve_icon_mode(&cli, config.as_ref().and_then(|c| c.icon_set.as_deref()));
     let config = config.unwrap_or_default();
 
-    let input: input::Input = if cli.demo {
+    let mut input: input::Input = if cli.demo {
         input::demo()
     } else {
         let mut buf = String::new();
@@ -73,6 +83,12 @@ fn main() {
             Err(_) => return,
         }
     };
+
+    if input.git_branch.is_none() {
+        if let Some(ref cwd) = input.cwd {
+            input.git_branch = git::branch(cwd);
+        }
+    }
 
     if config.stats.enabled && !cli.demo {
         stats::append_record(&input);
@@ -113,17 +129,7 @@ fn main() {
         None
     };
 
-    let out: String = elements
-        .iter()
-        .map(|line| {
-            line.iter()
-                .filter_map(|e| render::render(*e, &input, icon_mode, &config, &agg_stats))
-                .collect::<Vec<_>>()
-                .join(&config.separator)
-        })
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let out = render::render_all(&bar_lines, &input, icon_mode, &config, &agg_stats);
 
     print!("{out}");
 }

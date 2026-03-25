@@ -1,3 +1,3 @@
- [34m…/Git/my-project[0m |  [35mOpus 4.6[0m |  [2mv2.1.69[0m |  [2m[34m…/Git/my-project[0m |  [2mdemo-ses[0m
+ [34m…/Git/my-project[0m |  [35mOpus 4.6[0m |  [2mv2.1.69[0m |  [2m[35m[verbose][0m |  [35mmain[0m |  [2m[34m…/Git/my-project[0m |  [2mdemo-ses[0m
  [32m⣿[0m[32m⣿[0m[32m⣿[0m[2m⠀[0m[2m⠀[0m[2m⠀[0m[2m⠀[0m[2m⠀[0m[2m⠀[0m[2m⠀[0m [32m30%[0m |  [32m$4.11[0m |  [36m1h54m[0m |  [2m[36m16m[0m
  [32m+438[0m/[31m-265[0m |  [2m3.9k/28.6k[0m |  [2mr:59.0k w:1.5k[0m |  [36m98%[0m

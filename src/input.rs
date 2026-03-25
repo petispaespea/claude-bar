@@ -12,6 +12,8 @@ pub struct Input {
     pub exceeds_200k_tokens: Option<bool>,
     pub output_style: Option<OutputStyle>,
     pub workspace: Option<Workspace>,
+    #[serde(skip)]
+    pub git_branch: Option<String>,
     #[serde(flatten, default)]
     pub extra: Map<String, Value>,
 }
@@ -120,11 +122,12 @@ pub fn demo() -> Input {
         version: Some("2.1.69".into()),
         exceeds_200k_tokens: Some(false),
         output_style: Some(OutputStyle {
-            name: Some("default".into()),
+            name: Some("verbose".into()),
         }),
         workspace: Some(Workspace {
             project_dir: Some("/Users/demo/Git/my-project".into()),
         }),
+        git_branch: Some("main".into()),
         extra: Default::default(),
     }
 }

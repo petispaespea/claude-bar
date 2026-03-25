@@ -25,6 +25,14 @@ cargo build --release
 
 The `--setup` flag adds the `statusLine` entry to `~/.claude/settings.json`. Restart Claude Code to see it.
 
+### Interactive configuration
+
+```bash
+claude-bar --configure
+```
+
+Opens a TUI where you can build your bar layout visually — add, remove, and reorder elements with live preview. Settings like icon set, separator, and bar style are adjustable in a side panel. Saves directly to `~/.config/claude-bar.toml`.
+
 Preview without running Claude Code:
 
 ```bash
@@ -217,6 +225,7 @@ These require `[stats] enabled = true` in the TOML config:
 
 ```
 claude-bar --setup                            # Configure ~/.claude/settings.json
+claude-bar --configure                        # Interactive TUI configurator
 claude-bar --print-config                     # Generate TOML config to stdout
 claude-bar --config <path> --demo             # Use custom config file
 claude-bar --demo                             # Preview with sample data

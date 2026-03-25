@@ -282,6 +282,15 @@ impl Default for LayoutConfig {
     }
 }
 
+pub(crate) fn default_config_path() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Some(xdg_home) = env("XDG_CONFIG_HOME") {
+        return PathBuf::from(xdg_home).join("claude-bar.toml");
+    }
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    PathBuf::from(home).join(".config/claude-bar.toml")
+}
+
 fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
     use std::path::PathBuf;
 
@@ -295,20 +304,10 @@ fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
         return Some(PathBuf::from(path));
     }
 
-    if let Some(xdg_home) = env("XDG_CONFIG_HOME") {
-        let path = PathBuf::from(xdg_home).join("claude-bar.toml");
-        debug(&format!("config: trying {}", path.display()));
-        if path.exists() {
-            return Some(path);
-        }
-    }
-
-    if let Ok(home) = std::env::var("HOME") {
-        let path = PathBuf::from(home).join(".config/claude-bar.toml");
-        debug(&format!("config: trying {}", path.display()));
-        if path.exists() {
-            return Some(path);
-        }
+    let path = default_config_path();
+    debug(&format!("config: trying {}", path.display()));
+    if path.exists() {
+        return Some(path);
     }
 
     debug("config: no config file found, using defaults");

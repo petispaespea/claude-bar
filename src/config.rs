@@ -60,6 +60,35 @@ pub const COST_VS_AVG_ICONS: Icons = Icons { none: "",     oct: "\u{f4a8} ", fa:
 pub const BURN_RATE_ICONS: Icons  = Icons { none: "",     oct: "\u{f490} ", fa: "\u{f06d} " };
 
 impl Element {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Element::Model => "Model name (e.g. Opus 4.6)",
+            Element::Version => "Claude Code version",
+            Element::Context => "Context usage bar + percentage",
+            Element::Tokens => "Input/output token counts",
+            Element::Cache => "Cache read/write token counts",
+            Element::Cost => "Session cost in USD",
+            Element::Lines => "Lines added/removed",
+            Element::Duration => "API wait time",
+            Element::WallTime => "Wall clock elapsed time",
+            Element::GitBranch => "Git branch name",
+            Element::Cwd => "Current working directory",
+            Element::ProjectDir => "Project root directory",
+            Element::OutputStyle => "Output style indicator",
+            Element::Alert => "Conditional alert badges",
+            Element::SessionId => "Session identifier",
+            Element::ProjectTodayCost => "Today's spend for current project",
+            Element::BurnRate => "Cost per API hour",
+            Element::SpendRate => "Cost per wall-clock hour",
+            Element::DailyBudget => "Daily spend limit with progress bar",
+            Element::SessionTokPerDollar => "Output tokens per dollar",
+            Element::CacheHitRate => "Cache hit percentage",
+            Element::CostVsAvg => "Cost vs other projects today",
+            Element::CtxTrend => "Context usage direction",
+            Element::AvgDailyCost => "Average daily spend",
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             Element::Model => "model",
@@ -194,6 +223,9 @@ pub struct Cli {
     #[arg(long, help = "Add statusLine to ~/.claude/settings.json")]
     pub setup: bool,
 
+    #[arg(long, help = "Interactive configuration wizard")]
+    pub configure: bool,
+
     #[arg(
         long,
         value_name = "SHELL",
@@ -272,7 +304,7 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
     })
 }
 
-fn parse_element(s: &str) -> Option<Element> {
+pub(crate) fn parse_element(s: &str) -> Option<Element> {
     match s.trim() {
         "model" => Some(Element::Model),
         "version" => Some(Element::Version),
@@ -303,6 +335,49 @@ fn parse_element(s: &str) -> Option<Element> {
 }
 
 pub const LINE_BREAK: &str = "---";
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BarItem {
+    Element(Element),
+    LineBreak,
+}
+
+pub fn bar_items_to_lines(items: &[BarItem]) -> Vec<Vec<BarItem>> {
+    let mut lines: Vec<Vec<BarItem>> = vec![Vec::new()];
+    for item in items {
+        match item {
+            BarItem::LineBreak => lines.push(Vec::new()),
+            _ => lines.last_mut().unwrap().push(*item),
+        }
+    }
+    lines.retain(|l| !l.is_empty());
+    lines
+}
+
+pub fn element_lines_to_bar_items(lines: Vec<Vec<Element>>) -> Vec<BarItem> {
+    let mut items = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        for elem in line {
+            items.push(BarItem::Element(*elem));
+        }
+        if i < lines.len() - 1 {
+            items.push(BarItem::LineBreak);
+        }
+    }
+    items
+}
+
+pub fn bar_items_from_layout(entries: &[String]) -> Vec<BarItem> {
+    let mut items = Vec::new();
+    for entry in entries {
+        if entry.trim() == LINE_BREAK {
+            items.push(BarItem::LineBreak);
+        } else if let Some(elem) = parse_element(entry) {
+            items.push(BarItem::Element(elem));
+        }
+    }
+    items
+}
 
 fn split_into_lines<'a>(tokens: impl Iterator<Item = &'a str>) -> Vec<Vec<Element>> {
     let mut lines = vec![Vec::new()];
@@ -361,6 +436,14 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
     preset_elements("default").unwrap()
 }
 
+pub(crate) fn icon_mode_from_str(s: Option<&str>) -> IconMode {
+    match s {
+        Some("none" | "off") => IconMode::None,
+        Some("fontawesome" | "fa") => IconMode::FontAwesome,
+        _ => IconMode::Octicons,
+    }
+}
+
 pub fn resolve_icon_mode(cli: &Cli, toml_icon_set: Option<&str>) -> IconMode {
     if cli.no_icons {
         debug("icons: disabled via --no-icons");
@@ -370,11 +453,7 @@ pub fn resolve_icon_mode(cli: &Cli, toml_icon_set: Option<&str>) -> IconMode {
     let set = cli.icon_set.as_deref()
         .or(env_set.as_deref())
         .or(toml_icon_set);
-    let mode = match set {
-        Some("none" | "off") => IconMode::None,
-        Some("fontawesome" | "fa") => IconMode::FontAwesome,
-        _ => IconMode::Octicons,
-    };
+    let mode = icon_mode_from_str(set);
     if let Some(src) = set {
         debug(&format!("icons: {src} → {mode:?}"));
     } else {
@@ -444,6 +523,8 @@ MULTI-LINE LAYOUT
   Use \"---\" in layout.elements to split into multiple lines.
   Example: elements = [\"model\", \"context\", \"---\", \"cost\", \"duration\"]
   With --elements: --elements model,context,---,cost,duration
+
+TIP: Run --configure for an interactive TUI to build your layout visually.
 "
     );
 }
@@ -461,6 +542,7 @@ mod tests {
             icon_set: None,
             demo: false,
             setup: false,
+            configure: false,
             completions: None,
             print_config: false,
             config: None,

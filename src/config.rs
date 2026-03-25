@@ -200,7 +200,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, alert, project_today_cost/daily_cost, burn_rate, spend_rate, daily_budget, session_tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend, avg_daily_cost)"
+        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, session_id/session, alert, project_today_cost/daily_cost, burn_rate, spend_rate, daily_budget, session_tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend, avg_daily_cost)"
     )]
     pub elements: Option<String>,
 

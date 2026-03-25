@@ -198,6 +198,7 @@ Set `CLAUDE_BAR_DEBUG=1` to print diagnostic messages to stderr — useful for t
 | `cwd`                      | Working directory (shortened)              |
 | `project`, `project_dir`   | Project root (shortened)                   |
 | `style`, `output_style`    | Output style (hidden when "default")       |
+| `session_id`, `session`    | Claude session identifier                  |
 | `alert`                    | Conditional badges (context, budget)       |
 
 ### Input-only elements

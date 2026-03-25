@@ -128,6 +128,13 @@ fn active_indicator(active: bool) -> (&'static str, Style) {
     }
 }
 
+fn highlight_style() -> Style {
+    Style::default()
+        .fg(Color::Black)
+        .bg(Color::Green)
+        .add_modifier(Modifier::BOLD)
+}
+
 fn section_border_style(active: bool) -> Style {
     if active {
         Style::default().fg(Color::Cyan)
@@ -813,11 +820,7 @@ impl App {
 
         let list = List::new(self.bar_list_cache.clone())
             .block(block)
-            .highlight_style(
-                Style::default()
-                    .bg(Color::Indexed(236))
-                    .add_modifier(Modifier::BOLD),
-            );
+            .highlight_style(highlight_style());
         frame.render_stateful_widget(list, area, &mut self.list_state);
     }
 
@@ -850,11 +853,7 @@ impl App {
 
         let list = List::new(items)
             .block(block)
-            .highlight_style(
-                Style::default()
-                    .bg(Color::Indexed(236))
-                    .add_modifier(Modifier::BOLD),
-            );
+            .highlight_style(highlight_style());
         frame.render_stateful_widget(list, overlay, &mut picker.list_state);
     }
 

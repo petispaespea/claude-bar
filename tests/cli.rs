@@ -8,6 +8,7 @@ fn cmd() -> Command {
     c.env_remove("XDG_CONFIG_HOME");
     c.env_remove("CLAUDE_BAR");
     c.env_remove("CLAUDE_BAR_ICON_SET");
+    c.args(["--width", "0"]);
     c
 }
 

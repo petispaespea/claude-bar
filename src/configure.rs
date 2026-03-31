@@ -288,7 +288,7 @@ impl App {
     fn rebuild_preview(&mut self) {
         let ctx = self.demo_render_ctx();
         let lines = config::bar_items_to_lines(&self.items);
-        let out = render::render_all(&lines, &ctx.input, ctx.icon_mode, &ctx.config, &ctx.agg_stats);
+        let out = render::render_all(&lines, &ctx.input, ctx.icon_mode, &ctx.config, &ctx.agg_stats, None);
         self.preview_text = out.into_text().unwrap_or_default();
         self.bar_list_cache = self.build_bar_list_items(&ctx);
     }

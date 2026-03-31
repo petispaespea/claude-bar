@@ -121,7 +121,7 @@ pub fn append_record(input: &Input) {
     };
 
     let Ok(line) = serde_json::to_string(&record) else {
-        debug("stats: could not serialize record");
+        debug(|| "stats: could not serialize record".into());
         return;
     };
 
@@ -142,7 +142,7 @@ pub fn append_record(input: &Input) {
         .and_then(|mut f| writeln!(f, "{line}"));
 
     if let Err(e) = result {
-        debug(&format!("stats: could not write to {}: {e}", path.display()));
+        debug(|| format!("stats: could not write to {}: {e}", path.display()));
     }
 }
 
@@ -191,7 +191,7 @@ fn load_from_file(
             continue;
         }
         let Ok(record): Result<StatsRecord, _> = serde_json::from_str(&line) else {
-            debug(&format!(
+            debug(|| format!(
                 "stats: skipping malformed line: {}",
                 &line[..line.len().min(80)]
             ));

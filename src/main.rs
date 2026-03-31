@@ -13,6 +13,79 @@ use clap::Parser;
 use config::Cli;
 use std::io::Read;
 
+fn probe_parent_tty_width() -> Option<usize> {
+    #[cfg(not(target_os = "macos"))]
+    return None;
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut pid = unsafe { libc::getpid() };
+        for _ in 0..16 {
+            if pid <= 1 {
+                break;
+            }
+            if let Some((tdev, ppid)) = sysctl_proc_info(pid) {
+                if let Some(cols) = tty_width_from_dev(tdev) {
+                    return Some(cols);
+                }
+                pid = ppid;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+}
+
+/// Returns (e_tdev, e_ppid) for the given pid via sysctl.
+#[cfg(target_os = "macos")]
+fn sysctl_proc_info(pid: libc::pid_t) -> Option<(i32, i32)> {
+    // Offsets into struct kinfo_proc (from <sys/sysctl.h>, macOS 15 SDK).
+    // Layout is stable across arm64 and x86_64. Fields:
+    //   kp_eproc.e_ppid  (pid_t)  at byte 560
+    //   kp_eproc.e_tdev  (dev_t)  at byte 572
+    const KINFO_SIZE: usize = 648;
+    const PPID_OFF: usize = 560;
+    const TDEV_OFF: usize = 572;
+
+    let mut buf = [0u8; KINFO_SIZE];
+    let mut size = KINFO_SIZE;
+    let mut mib = [libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_PID, pid];
+    let ret = unsafe {
+        libc::sysctl(
+            mib.as_mut_ptr(),
+            4,
+            buf.as_mut_ptr() as *mut libc::c_void,
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if ret != 0 || size == 0 {
+        return None;
+    }
+    let ppid = i32::from_ne_bytes(buf[PPID_OFF..PPID_OFF + 4].try_into().ok()?);
+    let tdev = i32::from_ne_bytes(buf[TDEV_OFF..TDEV_OFF + 4].try_into().ok()?);
+    Some((tdev, ppid))
+}
+
+#[cfg(target_os = "macos")]
+fn tty_width_from_dev(tdev: i32) -> Option<usize> {
+    if tdev == -1 || tdev == 0 {
+        return None;
+    }
+    // macOS dev_t: major = (tdev >> 24) & 0xff, minor = tdev & 0xffffff
+    let major = ((tdev >> 24) & 0xff) as u32;
+    let minor = (tdev & 0xffffff) as u32;
+    // macOS pseudo-terminals have major 16
+    if major != 16 {
+        return None;
+    }
+    let path = format!("/dev/ttys{minor:03}");
+    let f = std::fs::File::open(&path).ok()?;
+    terminal_size::terminal_size_of(&f).map(|(w, _)| w.0 as usize)
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -129,7 +202,22 @@ fn main() {
         None
     };
 
-    let out = render::render_all(&bar_lines, &input, icon_mode, &config, &agg_stats);
+    let parent_width = probe_parent_tty_width();
+    let ctx_pct = input.ctx_pct().unwrap_or(0.0);
+    let margin = if ctx_pct >= 80.0 { config.width_margin } else { 0 };
+
+    let max_width: Option<usize> = match cli.width {
+        Some(0) => None,
+        Some(w) => Some(w),
+        None => parent_width
+            .map(|w| w.saturating_sub(margin)),
+    };
+
+    config::debug(|| format!("max_width: {max_width:?} (cli={:?}, parent_tty={parent_width:?}, ctx={ctx_pct:.0}%, margin={margin})",
+        cli.width,
+    ));
+
+    let out = render::render_all(&bar_lines, &input, icon_mode, &config, &agg_stats, max_width);
 
     print!("{out}");
 }

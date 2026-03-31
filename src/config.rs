@@ -253,6 +253,9 @@ pub struct Cli {
 
     #[arg(long, help = "Confirm destructive operations (required for --stats-clear)")]
     pub yes: bool,
+
+    #[arg(long, value_name = "N", help = "Override terminal width for element wrapping")]
+    pub width: Option<usize>,
 }
 
 pub fn build_cli() -> clap::Command {
@@ -400,19 +403,19 @@ pub(crate) fn env(key: &str) -> Option<String> {
     std::env::var(key).ok().filter(|v| !v.is_empty())
 }
 
-pub(crate) fn debug(msg: &str) {
+pub(crate) fn debug(msg: impl FnOnce() -> String) {
     if std::env::var("CLAUDE_BAR_DEBUG").is_ok() {
-        eprintln!("[claude-bar] {msg}");
+        eprintln!("[claude-bar] {}", msg());
     }
 }
 
 pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<Element>> {
     if let Some(ref spec) = cli.elements {
-        debug(&format!("elements: using --elements {spec}"));
+        debug(|| format!("elements: using --elements {spec}"));
         return parse_elements(spec);
     }
     if let Some(ref name) = cli.preset {
-        debug(&format!("elements: using --preset {name}"));
+        debug(|| format!("elements: using --preset {name}"));
         return preset_elements(name).unwrap_or_else(|| {
             eprintln!("Unknown preset: {name}. Use --info to see available presets.");
             std::process::exit(1);
@@ -420,19 +423,19 @@ pub fn resolve_elements(cli: &Cli, toml_layout: Option<&[String]>) -> Vec<Vec<El
     }
     if let Some(val) = env("CLAUDE_BAR") {
         if val.contains(',') {
-            debug(&format!("elements: using $CLAUDE_BAR={val}"));
+            debug(|| format!("elements: using $CLAUDE_BAR={val}"));
             return parse_elements(&val);
         }
         if let Some(elems) = preset_elements(&val) {
-            debug(&format!("elements: using $CLAUDE_BAR preset {val}"));
+            debug(|| format!("elements: using $CLAUDE_BAR preset {val}"));
             return elems;
         }
     }
     if let Some(layout) = toml_layout.filter(|l| !l.is_empty()) {
-        debug(&format!("elements: using TOML layout [{}]", layout.join(", ")));
+        debug(|| format!("elements: using TOML layout [{}]", layout.join(", ")));
         return split_into_lines(layout.iter().map(|s| s.as_str()));
     }
-    debug("elements: using built-in default preset");
+    debug(|| "elements: using built-in default preset".into());
     preset_elements("default").unwrap()
 }
 
@@ -446,7 +449,7 @@ pub(crate) fn icon_mode_from_str(s: Option<&str>) -> IconMode {
 
 pub fn resolve_icon_mode(cli: &Cli, toml_icon_set: Option<&str>) -> IconMode {
     if cli.no_icons {
-        debug("icons: disabled via --no-icons");
+        debug(|| "icons: disabled via --no-icons".into());
         return IconMode::None;
     }
     let env_set = env("CLAUDE_BAR_ICON_SET");
@@ -455,9 +458,9 @@ pub fn resolve_icon_mode(cli: &Cli, toml_icon_set: Option<&str>) -> IconMode {
         .or(toml_icon_set);
     let mode = icon_mode_from_str(set);
     if let Some(src) = set {
-        debug(&format!("icons: {src} → {mode:?}"));
+        debug(|| format!("icons: {src} → {mode:?}"));
     } else {
-        debug(&format!("icons: default → {mode:?}"));
+        debug(|| format!("icons: default → {mode:?}"));
     }
     mode
 }
@@ -551,6 +554,7 @@ mod tests {
             stats_project: None,
             stats_clear: false,
             yes: false,
+            width: None,
         }
     }
 

@@ -8,6 +8,7 @@ use crate::input::Input;
 use crate::stats::AggregateStats;
 use crate::style::{apply_style, parse_style};
 use crate::toml_config::BarConfig;
+use unicode_width::UnicodeWidthChar;
 
 const BRAILLE: [char; 9] = [
     '⠀', '⡀', '⡄', '⡆', '⡇', '⣇', '⣧', '⣷', '⣿',
@@ -24,6 +25,23 @@ const BG_YELLOW: &str = "\x1b[43m";
 const BG_BLUE: &str = "\x1b[44m";
 const WHITE: &str = "\x1b[97m";
 const BLACK: &str = "\x1b[30m";
+
+pub fn visible_width(s: &str) -> usize {
+    let mut width = 0;
+    let mut in_escape = false;
+    for c in s.chars() {
+        if in_escape {
+            if c == 'm' {
+                in_escape = false;
+            }
+        } else if c == '\x1b' {
+            in_escape = true;
+        } else {
+            width += UnicodeWidthChar::width(c).unwrap_or(1);
+        }
+    }
+    width
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum BarStyle {
@@ -325,7 +343,7 @@ fn render_alert(input: &Input, mode: IconMode, config: &BarConfig, agg_stats: &O
                 }
             }
             unknown => {
-                crate::config::debug(&format!("alert: unknown trigger '{unknown}', skipped"));
+                crate::config::debug(|| format!("alert: unknown trigger '{unknown}', skipped"));
                 false
             }
         };
@@ -461,8 +479,9 @@ pub fn render_all(
     mode: IconMode,
     config: &BarConfig,
     agg_stats: &Option<AggregateStats>,
+    max_width: Option<usize>,
 ) -> String {
-    elements
+    let rendered_lines: Vec<Vec<String>> = elements
         .iter()
         .map(|line| {
             line.iter()
@@ -470,10 +489,46 @@ pub fn render_all(
                     BarItem::Element(e) => render(*e, input, mode, config, agg_stats),
                     BarItem::LineBreak => None,
                 })
-                .collect::<Vec<_>>()
-                .join(&config.separator)
+                .collect()
         })
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n")
+        .collect();
+
+    let mut output_lines: Vec<String> = Vec::new();
+    let sep = &config.separator;
+    let sep_w = visible_width(sep);
+
+    for parts in rendered_lines {
+        if parts.is_empty() {
+            continue;
+        }
+        match max_width {
+            Some(w) => {
+                let mut line = String::new();
+                let mut line_w: usize = 0;
+                for part in parts {
+                    let part_w = visible_width(&part);
+                    if line.is_empty() {
+                        line = part;
+                        line_w = part_w;
+                    } else if line_w + sep_w + part_w <= w {
+                        line.push_str(sep);
+                        line.push_str(&part);
+                        line_w += sep_w + part_w;
+                    } else {
+                        output_lines.push(line);
+                        line = part;
+                        line_w = part_w;
+                    }
+                }
+                if !line.is_empty() {
+                    output_lines.push(line);
+                }
+            }
+            None => {
+                output_lines.push(parts.join(sep));
+            }
+        }
+    }
+
+    output_lines.join("\n")
 }

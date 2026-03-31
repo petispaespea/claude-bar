@@ -178,10 +178,14 @@ impl AlertRule {
     }
 }
 
+fn default_width_margin() -> usize { 50 }
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct BarConfig {
     pub separator: String,
+    #[serde(default = "default_width_margin")]
+    pub width_margin: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_set: Option<String>,
     pub layout: LayoutConfig,
@@ -218,6 +222,7 @@ impl Default for BarConfig {
     fn default() -> Self {
         Self {
             separator: " | ".into(),
+            width_margin: 50,
             icon_set: None,
             layout: Default::default(),
             stats: Default::default(),
@@ -295,22 +300,22 @@ fn resolve_config_path(cli_path: Option<&str>) -> Option<std::path::PathBuf> {
     use std::path::PathBuf;
 
     if let Some(path) = cli_path {
-        debug(&format!("config: using --config {path}"));
+        debug(|| format!("config: using --config {path}"));
         return Some(PathBuf::from(path));
     }
 
     if let Some(path) = env("CLAUDE_BAR_CONFIG") {
-        debug(&format!("config: using $CLAUDE_BAR_CONFIG={path}"));
+        debug(|| format!("config: using $CLAUDE_BAR_CONFIG={path}"));
         return Some(PathBuf::from(path));
     }
 
     let path = default_config_path();
-    debug(&format!("config: trying {}", path.display()));
+    debug(|| format!("config: trying {}", path.display()));
     if path.exists() {
         return Some(path);
     }
 
-    debug("config: no config file found, using defaults");
+    debug(|| "config: no config file found, using defaults".into());
     None
 }
 
@@ -318,13 +323,13 @@ pub fn load_config(cli_path: Option<&str>) -> Option<BarConfig> {
     let path = resolve_config_path(cli_path)?;
 
     let Ok(contents) = std::fs::read_to_string(&path) else {
-        debug(&format!("config: could not read {}, using defaults", path.display()));
+        debug(|| format!("config: could not read {}, using defaults", path.display()));
         return None;
     };
 
     match toml::from_str::<BarConfig>(&contents) {
         Ok(config) => {
-            debug(&format!("config: loaded {}", path.display()));
+            debug(|| format!("config: loaded {}", path.display()));
             Some(config)
         }
         Err(e) => {

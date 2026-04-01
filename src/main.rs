@@ -144,10 +144,10 @@ fn main() {
     let icon_mode = config::resolve_icon_mode(&cli, config.as_ref().and_then(|c| c.icon_set.as_deref()));
     let config = config.unwrap_or_default();
 
+    let mut buf = String::new();
     let mut input: input::Input = if cli.demo {
         input::demo()
     } else {
-        let mut buf = String::new();
         if std::io::stdin().read_to_string(&mut buf).is_err() {
             return;
         }
@@ -164,7 +164,10 @@ fn main() {
     }
 
     if config.stats.enabled && !cli.demo {
-        stats::append_record(&input);
+        match serde_json::from_str(&buf) {
+            Ok(serde_json::Value::Object(raw)) => stats::append_record(&raw),
+            _ => config::debug(|| "stats: could not re-parse input as JSON object".into()),
+        }
     }
 
     let agg_stats = if config.stats.enabled {

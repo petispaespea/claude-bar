@@ -19,7 +19,7 @@ fn now_secs() -> u64 {
 const MS_PER_HOUR: f64 = 3_600_000.0;
 const SECS_PER_DAY: u64 = 86_400;
 
-const STATS_VERSION: u8 = 2;
+const STATS_VERSION: u8 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsRecord {
@@ -110,17 +110,19 @@ fn default_data_dir() -> PathBuf {
     PathBuf::from(home).join(".local/share")
 }
 
-pub fn append_record(input: &Input) {
+pub fn append_record(input: &serde_json::Map<String, serde_json::Value>) {
+    #[derive(Serialize)]
+    struct Record<'a> {
+        v: u8,
+        ts: u64,
+        #[serde(flatten)]
+        data: &'a serde_json::Map<String, serde_json::Value>,
+    }
+
     let now = now_secs();
     let path = stats_file_for_day(now);
 
-    let record = StatsRecord {
-        v: STATS_VERSION,
-        ts: now,
-        input: input.clone(),
-    };
-
-    let Ok(line) = serde_json::to_string(&record) else {
+    let Ok(line) = serde_json::to_string(&Record { v: STATS_VERSION, ts: now, data: input }) else {
         debug(|| "stats: could not serialize record".into());
         return;
     };

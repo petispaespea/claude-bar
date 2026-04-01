@@ -4,6 +4,7 @@ use serde_json::{Map, Value};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Input {
     pub session_id: Option<String>,
+    pub session_name: Option<String>,
     pub model: Option<Model>,
     pub context_window: Option<ContextWindow>,
     pub cost: Option<Cost>,
@@ -99,6 +100,7 @@ pub struct Workspace {
 pub fn demo() -> Input {
     Input {
         session_id: Some("demo-session-001".into()),
+        session_name: Some("implement feature X".into()),
         model: Some(Model {
             display_name: Some("Opus 4.6".into()),
         }),

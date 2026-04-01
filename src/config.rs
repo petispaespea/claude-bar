@@ -26,6 +26,7 @@ pub enum Element {
     CtxTrend,
     AvgDailyCost,
     SessionId,
+    SessionName,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -77,6 +78,7 @@ impl Element {
             Element::OutputStyle => "Output style indicator",
             Element::Alert => "Conditional alert badges",
             Element::SessionId => "Session identifier",
+            Element::SessionName => "Session name",
             Element::ProjectTodayCost => "Today's spend for current project",
             Element::BurnRate => "Cost per API hour",
             Element::SpendRate => "Cost per wall-clock hour",
@@ -115,6 +117,7 @@ impl Element {
             Element::CtxTrend => "ctx_trend",
             Element::AvgDailyCost => "avg_daily_cost",
             Element::SessionId => "session_id",
+            Element::SessionName => "session_name",
         }
     }
 }
@@ -135,6 +138,7 @@ const ALL_ELEMENTS: &[Element] = &[
     Element::OutputStyle,
     Element::Alert,
     Element::SessionId,
+    Element::SessionName,
     Element::ProjectTodayCost,
     Element::BurnRate,
     Element::SpendRate,
@@ -150,6 +154,7 @@ pub const CORE_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
     "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
     "session_id",
+    "session_name",
 ];
 
 pub const STATS_ELEMENT_NAMES: &[&str] = &[
@@ -162,6 +167,7 @@ pub const ALL_ELEMENT_NAMES: &[&str] = &[
     "model", "version", "context", "tokens", "cache",
     "cost", "lines", "duration", "wall_time", "git_branch", "cwd", "project", "style", "alert",
     "session_id",
+    "session_name",
     "project_today_cost", "burn_rate", "spend_rate",
     "daily_budget", "session_tok_per_dollar", "cache_hit_rate", "cost_vs_avg", "ctx_trend",
     "avg_daily_cost",
@@ -200,7 +206,7 @@ pub struct Cli {
         short,
         long,
         value_name = "LIST",
-        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, session_id/session, alert, project_today_cost/daily_cost, burn_rate, spend_rate, daily_budget, session_tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend, avg_daily_cost)"
+        help = "Comma-separated elements; use --- for line break (model, version, context/ctx, tokens, cache, cost, lines, duration/time, wall_time/wall/elapsed, git_branch/branch/git, cwd, project/project_dir, style/output_style, session_id/session, session_name, alert, project_today_cost/daily_cost, burn_rate, spend_rate, daily_budget, session_tok_per_dollar, cache_hit_rate/cache_hit, cost_vs_avg, ctx_trend, avg_daily_cost)"
     )]
     pub elements: Option<String>,
 
@@ -286,7 +292,7 @@ pub(crate) fn preset_elements(name: &str) -> Option<Vec<Vec<Element>>> {
             vec![
                 Element::ProjectDir, Element::Model, Element::Version,
                 Element::OutputStyle, Element::GitBranch, Element::Cwd,
-                Element::DailyBudget, Element::SessionId,
+                Element::DailyBudget, Element::SessionId, Element::SessionName,
             ],
             vec![
                 Element::Context, Element::CtxTrend, Element::Cost,
@@ -333,6 +339,7 @@ pub(crate) fn parse_element(s: &str) -> Option<Element> {
         "ctx_trend" => Some(Element::CtxTrend),
         "avg_daily_cost" => Some(Element::AvgDailyCost),
         "session_id" | "session" => Some(Element::SessionId),
+        "session_name" => Some(Element::SessionName),
         _ => None,
     }
 }
@@ -495,6 +502,7 @@ ELEMENTS
   alert          Conditional badges (ctx exceeded, ctx high, budget)
   session_id,    Session identifier (first 8 characters)
     session
+  session_name   Session name
 
 STATS ELEMENTS (require [stats] enabled = true)
   project_today_cost  Today's spend for current project (alias: daily_cost)
@@ -668,7 +676,7 @@ mod tests {
         let lines = preset_elements("full").unwrap();
         assert_eq!(lines.len(), 5);
         let all: Vec<Element> = lines.into_iter().flatten().collect();
-        assert_eq!(all.len(), 24);
+        assert_eq!(all.len(), 25);
         for elem in ALL_ELEMENTS.iter() {
             assert!(all.contains(elem));
         }

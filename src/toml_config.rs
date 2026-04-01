@@ -46,6 +46,7 @@ module_config!(SessionTokPerDollarConfig, TOKENS_ICONS,     "dim cyan");
 module_config!(CacheHitRateConfig, CACHE_ICONS,      "cyan");
 module_config!(CostVsAvgConfig,   COST_VS_AVG_ICONS, "dim blue");
 module_config!(SessionIdConfig,   SESSION_ID_ICONS, "dim");
+module_config!(SessionNameConfig,  SESSION_ID_ICONS, "dim");
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -212,6 +213,7 @@ pub struct BarConfig {
     pub cache_hit_rate: CacheHitRateConfig,
     pub cost_vs_avg: CostVsAvgConfig,
     pub session_id: SessionIdConfig,
+    pub session_name: SessionNameConfig,
     pub avg_daily_cost: AvgDailyCostConfig,
     pub ctx_trend: CtxTrendConfig,
     #[serde(rename = "alert")]
@@ -247,6 +249,7 @@ impl Default for BarConfig {
             cache_hit_rate: Default::default(),
             cost_vs_avg: Default::default(),
             session_id: Default::default(),
+            session_name: Default::default(),
             avg_daily_cost: Default::default(),
             ctx_trend: Default::default(),
             alerts: vec![
@@ -353,7 +356,7 @@ pub fn config_toml() -> String {
     config.stats.enabled = true;
     let brk = crate::config::LINE_BREAK.to_string();
     let elements: Vec<String> =
-        ["project", "model", "version", "style", "git_branch", "cwd", "daily_budget", "session_id"].iter().map(|s| s.to_string())
+        ["project", "model", "version", "style", "git_branch", "cwd", "daily_budget", "session_id", "session_name"].iter().map(|s| s.to_string())
         .chain(std::iter::once(brk.clone()))
         .chain(["context", "ctx_trend", "cost", "wall_time", "spend_rate", "duration", "burn_rate"].iter().map(|s| s.to_string()))
         .chain(std::iter::once(brk.clone()))

@@ -312,6 +312,12 @@ fn render_session_id(input: &Input, mode: IconMode, config: &BarConfig) -> Optio
         &SESSION_ID_ICONS, Some(short.to_string()))
 }
 
+fn render_session_name(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
+    let name = input.session_name.as_ref()?;
+    render_element(&config.session_name.symbol, &config.session_name.style, mode,
+        &SESSION_ID_ICONS, Some(name.clone()))
+}
+
 fn severity_style(severity: &str) -> (&'static str, &'static str) {
     match severity {
         "warn" => (BG_YELLOW, BLACK),
@@ -460,6 +466,7 @@ pub fn render(elem: Element, input: &Input, mode: IconMode, config: &BarConfig, 
         Element::ProjectDir => render_project(input, mode, config),
         Element::OutputStyle => render_output_style(input, mode, config),
         Element::SessionId => render_session_id(input, mode, config),
+        Element::SessionName => render_session_name(input, mode, config),
         Element::Alert => render_alert(input, mode, config, agg_stats),
         Element::ProjectTodayCost => render_project_today_cost(input, mode, config, agg_stats),
         Element::BurnRate => render_burn_rate(input, mode, config, agg_stats),

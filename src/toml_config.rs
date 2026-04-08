@@ -170,9 +170,9 @@ impl AlertRule {
         match self.label.as_deref() {
             Some(s) => s.to_string(),
             None => match self.trigger.as_str() {
-                "ctx_exceeded" => "CTX EXCEEDED".into(),
-                "ctx_high" => "CTX HIGH".into(),
-                "cost_high" => "BUDGET EXCEEDED".into(),
+                "ctx_exceeded" => "CTX over 200K".into(),
+                "ctx_high" => "CTX high".into(),
+                "cost_high" => "BUDGET exceeded".into(),
                 other => other.to_uppercase().replace('_', " "),
             },
         }
@@ -613,10 +613,10 @@ show_pct = false
         assert_eq!(config.alerts[0].severity, "error");
         assert!(config.alerts[0].threshold.is_none());
         assert!(config.alerts[0].label.is_none());
-        assert_eq!(config.alerts[0].display_label(), "CTX EXCEEDED");
+        assert_eq!(config.alerts[0].display_label(), "CTX over 200K");
         assert_eq!(config.alerts[1].trigger, "cost_high");
         assert!(config.alerts[1].label.is_none());
-        assert_eq!(config.alerts[1].display_label(), "BUDGET EXCEEDED");
+        assert_eq!(config.alerts[1].display_label(), "BUDGET exceeded");
     }
 
     #[test]

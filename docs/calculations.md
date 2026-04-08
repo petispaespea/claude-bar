@@ -155,8 +155,8 @@ Alerts are rule-based badges configured in `[[alert]]` TOML sections.
 
 | Trigger | Condition | Default label |
 |---|---|---|
-| `ctx_exceeded` | `input.exceeds_200k_tokens == true` | `CTX EXCEEDED` |
+| `ctx_exceeded` | `input.exceeds_200k_tokens == true` | `CTX over 200K` |
 | `ctx_high` | `used_percentage >= threshold` | (user-defined) |
-| `cost_high` | `daily_budget_pct >= 100` | `BUDGET EXCEEDED` |
+| `cost_high` | `daily_budget_pct >= 100` | `BUDGET exceeded` |
 
 Severity controls badge color: `error` = red bg, `warn` = yellow bg, `info` = blue bg.

@@ -282,8 +282,18 @@ fn render_wall_time(input: &Input, mode: IconMode, config: &BarConfig) -> Option
 
 fn render_git_branch(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {
     let branch = input.git_branch.as_ref()?;
+    let detached = input.git_commit.as_ref() == Some(branch);
+    let value = if detached {
+        input.git_tag.as_ref().unwrap_or(branch).to_string()
+    } else {
+        let detail = input.git_tag.as_ref().or(input.git_commit.as_ref());
+        match detail {
+            Some(d) => format!("{branch} ({d})"),
+            None => branch.to_string(),
+        }
+    };
     render_element(&config.git_branch.symbol, &config.git_branch.style, mode,
-        &GIT_BRANCH_ICONS, Some(branch.to_string()))
+        &GIT_BRANCH_ICONS, Some(value))
 }
 
 fn render_cwd(input: &Input, mode: IconMode, config: &BarConfig) -> Option<String> {

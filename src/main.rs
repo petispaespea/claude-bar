@@ -160,7 +160,10 @@ fn main() {
     if input.git_branch.is_none()
         && let Some(ref cwd) = input.cwd
     {
-        input.git_branch = git::branch(cwd);
+        let gi = git::info(cwd);
+        input.git_branch = gi.branch;
+        input.git_commit = gi.sha;
+        input.git_tag = gi.tag;
     }
 
     if config.stats.enabled && !cli.demo {

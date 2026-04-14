@@ -15,6 +15,10 @@ pub struct Input {
     pub workspace: Option<Workspace>,
     #[serde(skip)]
     pub git_branch: Option<String>,
+    #[serde(skip)]
+    pub git_commit: Option<String>,
+    #[serde(skip)]
+    pub git_tag: Option<String>,
     #[serde(flatten, default)]
     pub extra: Map<String, Value>,
 }
@@ -130,6 +134,8 @@ pub fn demo() -> Input {
             project_dir: Some("/Users/demo/Git/my-project".into()),
         }),
         git_branch: Some("main".into()),
+        git_commit: Some("abc1234".into()),
+        git_tag: Some("v0.8.8".into()),
         extra: Default::default(),
     }
 }

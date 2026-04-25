@@ -36,12 +36,11 @@ fn find_tag(git_dir: &Path, full_sha: &str) -> Option<String> {
         for line in packed.lines() {
             if line.starts_with('#') { continue; }
             let mut parts = line.split_whitespace();
-            if let (Some(sha), Some(refname)) = (parts.next(), parts.next()) {
-                if sha == full_sha {
-                    if let Some(tag) = refname.strip_prefix("refs/tags/") {
-                        return Some(tag.to_string());
-                    }
-                }
+            if let (Some(sha), Some(refname)) = (parts.next(), parts.next())
+                && sha == full_sha
+                && let Some(tag) = refname.strip_prefix("refs/tags/")
+            {
+                return Some(tag.to_string());
             }
         }
     }
@@ -50,10 +49,10 @@ fn find_tag(git_dir: &Path, full_sha: &str) -> Option<String> {
     let tags_dir = git_dir.join("refs/tags");
     if let Ok(entries) = std::fs::read_dir(&tags_dir) {
         for entry in entries.flatten() {
-            if let Ok(contents) = std::fs::read_to_string(entry.path()) {
-                if contents.trim() == full_sha {
-                    return entry.file_name().to_str().map(str::to_string);
-                }
+            if let Ok(contents) = std::fs::read_to_string(entry.path())
+                && contents.trim() == full_sha
+            {
+                return entry.file_name().to_str().map(str::to_string);
             }
         }
     }

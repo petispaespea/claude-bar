@@ -15,11 +15,12 @@ How each element's displayed value is computed.
 | `lines` | `input.cost.{total_lines_added, total_lines_removed}` | `+{add}/-{del}`, hidden when both zero |
 | `duration` | `input.cost.total_api_duration_ms` | formatted as `Xm`, `XhYm`, etc. |
 | `wall_time` | `input.cost.total_duration_ms` | same format as duration |
-| `git_branch` | resolved from `.git/HEAD` via `input.cwd` (pre-computed before rendering) | branch name string |
+| `git_branch` | resolved from `.git/HEAD` via `input.cwd` (pre-computed before rendering) | `branch (commit)` or `branch (tag)`, tag only when detached HEAD |
 | `cwd` | `input.cwd` | shortened path (last 2 components) |
 | `project` | `input.workspace.project_dir` | shortened path (last 2 components) |
 | `style` | `input.output_style.name` | `[{name}]`, hidden when `"default"` |
 | `cache_hit_rate` | derived from cache read/write tokens | `cache_read / (cache_read + cache_write) * 100`, displayed as `{pct}%` |
+| `session_name` | `input.session_name` | raw string, hidden when absent |
 
 ## Stats elements (require `[stats] enabled = true`)
 
@@ -33,12 +34,12 @@ The `[stats] day_window` setting controls the time window:
 
 | Element | Formula | Display | Condition |
 |---|---|---|---|
-| `project_daily_cost` | `Σ(final_cost - first_cost)` for completed sessions matching current project + `cur_delta` if current session matches project | `$X.XX/day` | — |
+| `project_today_cost` | `Σ(final_cost - first_cost)` for completed sessions matching current project + `cur_delta` if current session matches project | `$X.XX/day` | — |
 | `daily_budget` | `all_daily_cost / limit × 100` where `all_daily_cost = Σ(final_cost - first_cost)` all completed sessions + `cur_delta` | `$spent/$limit` + bar + `pct%` | `limit > 0` in config |
 | `burn_rate` | `current_cost / (current_api_ms / 3,600,000)` | `$X.XX/hr` | `api_ms ≥ 60s` |
 | `spend_rate` | `current_cost / (current_wall_ms / 3,600,000)` | `$X.XX/hr` | `wall_ms ≥ 300s` |
 | `session_count` | number of sessions grouped by `(project, session_id)` matching current project | `#N` | — |
-| `tok_per_dollar` | `current_out_tok / current_cost` | `Nk/$` | `cost > 0.001` |
+| `session_tok_per_dollar` | `current_out_tok / current_cost` | `Nk/$` | `cost > 0.001` |
 | `cost_vs_avg` | `current_cost / (Σ other_sessions.final_cost / other_count)` | `X.X× avg` | `≥1 other session`, `avg > 0.001` |
 | `ctx_trend` | `current_ctx_pct - ctx_pct[now - lookback_secs]` | `▲/▼/▸ ±N%` | `≥2 records` with `ctx_pct` |
 
@@ -46,7 +47,7 @@ The `[stats] day_window` setting controls the time window:
 
 - **`cur_delta`** = `max(0, current_cost - cur_session.first_cost)` — today-only spend for the live session
 - **`first_cost`** / **`final_cost`** — first and last `total_cost_usd` recorded today for a session
-- **delta-based** costs (`project_daily_cost`, `daily_budget`) use `final - first` to exclude pre-midnight spend
+- **delta-based** costs (`project_today_cost`, `daily_budget`) use `final - first` to exclude pre-midnight spend
 - **absolute** costs (`cost_vs_avg`) use `final_cost` to compare full session sizes
 
 ### Session grouping
@@ -55,13 +56,13 @@ Records are grouped into sessions by `(project_dir, session_id)`. All records sh
 
 ### Computed fields
 
-#### `project_daily_cost`
+#### `project_today_cost`
 
 Today's spend for the current project only.
 
 ```
 project_delta = sum of (final_cost - first_cost) for completed sessions matching current_project
-project_daily_cost = project_delta + (cur_delta if current session matches current_project, else 0)
+project_today_cost = project_delta + (cur_delta if current session matches current_project, else 0)
 ```
 
 Displayed as `$X.XX/day`.
@@ -111,12 +112,12 @@ daily_budget_pct = all_daily_cost / limit * 100
 
 Requires: `daily_budget.limit > 0` in config (default: `$100`). Displayed as `$spent/$limit` with optional bar and percentage. Color: green <50%, yellow <80%, red >=80%.
 
-#### `tok_per_dollar`
+#### `session_tok_per_dollar`
 
 Output tokens per dollar for the current session.
 
 ```
-tok_per_dollar = current_out_tok / current_cost
+session_tok_per_dollar = current_out_tok / current_cost
 ```
 
 Requires: `current_cost > 0.001`. Displayed as `{tokens}/$` with K/M suffixes.

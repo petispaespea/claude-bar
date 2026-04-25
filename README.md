@@ -194,11 +194,12 @@ Set `CLAUDE_BAR_DEBUG=1` to print diagnostic messages to stderr — useful for t
 | `lines`                    | Lines added/removed                        |
 | `duration`, `time`         | API wait time                              |
 | `wall_time`, `wall`, `elapsed` | Wall clock elapsed time                |
-| `git_branch`, `branch`, `git` | Git branch name (reads .git/HEAD)       |
+| `git_branch`, `branch`, `git` | Git branch + commit hash or tag        |
 | `cwd`                      | Working directory (shortened)              |
 | `project`, `project_dir`   | Project root (shortened)                   |
 | `style`, `output_style`    | Output style (hidden when "default")       |
 | `session_id`, `session`    | Claude session identifier                  |
+| `session_name`             | Session name (task description)            |
 | `alert`                    | Conditional badges (context, budget)       |
 
 ### Input-only elements
@@ -220,7 +221,7 @@ These require `[stats] enabled = true` in the TOML config:
 | `session_tok_per_dollar` | Output tokens per dollar        |
 | `avg_daily_cost` | Average daily spend for current project (configurable lookback) |
 | `cost_vs_avg`   | Current project cost vs other projects today |
-| `ctx_trend`     | Context usage direction over last 10 renders |
+| `ctx_trend`     | Context usage direction (configurable window, default 5 min) |
 
 ## CLI reference
 

@@ -21,6 +21,11 @@ const SECS_PER_DAY: u64 = 86_400;
 
 const STATS_VERSION: u8 = 3;
 
+/// Tolerance for treating two recorded costs as equal (re-attach detection).
+const COST_EQ_EPS: f64 = 0.001;
+/// Tolerance for treating a recorded cost as effectively zero.
+const COST_ZERO_EPS: f64 = 0.0001;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsRecord {
     #[serde(default)]
@@ -68,10 +73,6 @@ impl Session<'_> {
 
     pub fn first_cost(&self) -> f64 {
         self.records.first().and_then(|r| r.cost()).unwrap_or(0.0)
-    }
-
-    pub fn cost_delta(&self) -> f64 {
-        self.final_cost() - self.first_cost()
     }
 
     pub fn session_id(&self) -> Option<&str> {
@@ -215,10 +216,23 @@ pub fn load_today_records(day_window: &str) -> Vec<StatsRecord> {
     if day_window == "rolling" {
         return load_records(1, None);
     }
-    let path = stats_file_for_day(now_secs());
+    load_day_records(now_secs())
+}
+
+fn load_day_records(ts: u64) -> Vec<StatsRecord> {
     let mut records = Vec::new();
-    load_from_file(&path, 0, None, &mut records);
+    load_from_file(&stats_file_for_day(ts), 0, None, &mut records);
     records
+}
+
+/// Returns session_id -> final cost recorded yesterday. Used as a baseline so
+/// that sessions spanning midnight only contribute today's added cost.
+pub(crate) fn load_prev_day_session_costs() -> HashMap<String, f64> {
+    let records = load_day_records(now_secs().saturating_sub(SECS_PER_DAY));
+    group_sessions(&records)
+        .into_iter()
+        .filter_map(|s| Some((s.session_id()?.to_string(), s.final_cost())))
+        .collect()
 }
 
 pub fn group_sessions<'a>(records: &'a [StatsRecord]) -> Vec<Session<'a>> {
@@ -258,6 +272,7 @@ pub struct AggregateParams<'a> {
     pub budget_limit: Option<f64>,
     pub current_project: Option<&'a str>,
     pub ctx_lookback_secs: u64,
+    pub prev_day_session_costs: &'a HashMap<String, f64>,
 }
 
 fn cost_per_hour(cost: Option<f64>, ms: Option<u64>, min_ms: u64) -> Option<f64> {
@@ -285,32 +300,39 @@ pub fn compute_aggregate_stats(params: &AggregateParams) -> AggregateStats {
     };
     let cur_idx = current_session_index(&sessions, params.current_session_id);
 
-    let mut all_delta = 0.0_f64;
-    let mut project_delta = 0.0_f64;
-    let mut cur_first_cost = 0.0_f64;
-    let cur_matches_project = cur_idx.is_some_and(|i| matches_project(&sessions[i]));
-
+    let mut all_today_cost = 0.0_f64;
+    let mut project_today_cost = 0.0_f64;
     let mut project_costs: HashMap<&str, f64> = HashMap::new();
 
     for (i, s) in sessions.iter().enumerate() {
-        if Some(i) != cur_idx {
-            let delta = s.cost_delta();
-            all_delta += delta;
-            if matches_project(s) {
-                project_delta += delta;
-            }
-            if let Some(proj) = s.project()
-                && params.current_project != Some(proj)
-            {
-                *project_costs.entry(proj).or_insert(0.0) += delta;
-            }
+        let baseline = session_baseline(&sessions, i, params.prev_day_session_costs);
+        let raw = if Some(i) == cur_idx {
+            params.current_cost.unwrap_or(0.0)
         } else {
-            cur_first_cost = s.first_cost();
+            s.final_cost()
+        };
+        let contribution = (raw - baseline).max(0.0);
+        all_today_cost += contribution;
+        if matches_project(s) {
+            project_today_cost += contribution;
+        }
+        if Some(i) != cur_idx
+            && let Some(proj) = s.project()
+            && params.current_project != Some(proj)
+        {
+            *project_costs.entry(proj).or_insert(0.0) += contribution;
         }
     }
-    let cur_delta = (params.current_cost.unwrap_or(0.0) - cur_first_cost).max(0.0);
-    let all_today_cost = all_delta + cur_delta;
-    let project_today_cost = project_delta + if cur_matches_project { cur_delta } else { 0.0 };
+
+    if cur_idx.is_none()
+        && let Some(cost) = params.current_cost
+    {
+        let baseline = params
+            .current_session_id
+            .and_then(|sid| params.prev_day_session_costs.get(sid).copied())
+            .unwrap_or(0.0);
+        all_today_cost += (cost - baseline).max(0.0);
+    }
 
     let burn_rate = cost_per_hour(params.current_cost, params.current_api_ms, 60_000);
 
@@ -358,6 +380,51 @@ pub fn compute_aggregate_stats(params: &AggregateParams) -> AggregateStats {
     }
 }
 
+/// Computes the cost baseline to subtract for a given session, so its
+/// contribution to today's spend reflects only what was added today.
+///
+/// Three cases:
+/// 1. Session existed yesterday → baseline is yesterday's final cost.
+/// 2. First record's cost matches another (today or yesterday) session's final
+///    cost → re-attach of an existing conversation under a new session_id;
+///    baseline is that matching cost.
+/// 3. Otherwise → baseline is 0; the session started fresh today and the
+///    first observation already contains the first turn's cost.
+fn session_baseline(
+    sessions: &[Session<'_>],
+    idx: usize,
+    prev_day_costs: &HashMap<String, f64>,
+) -> f64 {
+    let session = &sessions[idx];
+    if let Some(sid) = session.session_id()
+        && let Some(&v) = prev_day_costs.get(sid)
+    {
+        return v;
+    }
+    let first_cost = session.first_cost();
+    if first_cost <= COST_ZERO_EPS {
+        return 0.0;
+    }
+    let start_ts = session.start_ts();
+    let matches_other_today = sessions.iter().enumerate().any(|(i, other)| {
+        i != idx
+            && other.start_ts() < start_ts
+            && (other.final_cost() - first_cost).abs() < COST_EQ_EPS
+    });
+    if matches_other_today {
+        return first_cost;
+    }
+    // The early `prev_day_costs.get(sid)` return above already covered self,
+    // so any match here is necessarily a different session (cross-day re-attach).
+    let matches_prev_day = prev_day_costs
+        .values()
+        .any(|&final_cost| (final_cost - first_cost).abs() < COST_EQ_EPS);
+    if matches_prev_day {
+        return first_cost;
+    }
+    0.0
+}
+
 fn compute_ctx_trend(records: &[StatsRecord], lookback_secs: u64) -> Option<f64> {
     if records.len() < 2 {
         return None;
@@ -383,10 +450,13 @@ pub fn avg_daily_cost_from_records(records: &[StatsRecord]) -> Option<f64> {
         return None;
     }
     let sessions = group_sessions(records);
+    let prev_day = HashMap::new();
     let mut by_day: HashMap<String, f64> = HashMap::new();
-    for s in &sessions {
+    for (i, s) in sessions.iter().enumerate() {
+        let baseline = session_baseline(&sessions, i, &prev_day);
+        let contribution = (s.final_cost() - baseline).max(0.0);
         let day = day_string(s.start_ts());
-        *by_day.entry(day).or_insert(0.0) += s.cost_delta();
+        *by_day.entry(day).or_insert(0.0) += contribution;
     }
     if by_day.is_empty() {
         return None;
@@ -576,6 +646,12 @@ mod tests {
 
     const LOOKBACK: u64 = 300;
 
+    fn empty_prev_day() -> &'static HashMap<String, f64> {
+        use std::sync::OnceLock;
+        static EMPTY: OnceLock<HashMap<String, f64>> = OnceLock::new();
+        EMPTY.get_or_init(HashMap::new)
+    }
+
     fn record(ts: u64, cost: f64, project: &str) -> StatsRecord {
         record_with_session(ts, cost, project, "default")
     }
@@ -683,6 +759,7 @@ mod tests {
             budget_limit: budget,
             current_project: project,
             ctx_lookback_secs: LOOKBACK,
+            prev_day_session_costs: empty_prev_day(),
         }
     }
 
@@ -696,8 +773,7 @@ mod tests {
         ];
         let params = make_params(&records, Some("bbb"), Some(1.5), Some(120_000), None, Some(500), None, Some("/proj"));
         let stats = compute_aggregate_stats(&params);
-        // all_today_cost: session aaa delta (2-1=1) + cur_delta (1.5-0.5=1) = 2.0
-        assert!((stats.all_today_cost - 2.0).abs() < 0.01);
+        assert!((stats.all_today_cost - 3.5).abs() < 0.01);
     }
 
     #[test]
@@ -760,6 +836,11 @@ mod tests {
         session_id: &str,
         current_cost: f64,
     ) -> AggregateStats {
+        // The fixture's first session "e8d" begins at $160.80, modeling a
+        // carry-over from yesterday. Provide that baseline so today's spend is
+        // computed correctly with the new logic.
+        let mut prev_day = HashMap::new();
+        prev_day.insert("e8d".to_string(), 160.80);
         let params = AggregateParams {
             today_records: records,
             current_session_id: Some(session_id),
@@ -770,6 +851,7 @@ mod tests {
             budget_limit: None,
             current_project: Some("/proj"),
             ctx_lookback_secs: LOOKBACK,
+            prev_day_session_costs: &prev_day,
         };
         compute_aggregate_stats(&params)
     }
@@ -824,8 +906,8 @@ mod tests {
         let records = vec![record(1000, 10.0, "/proj"), record(2000, 50.0, "/proj")];
         let params = make_params(&records, None, Some(50.0), Some(60_000), None, Some(100), Some(100.0), Some("/proj"));
         let stats = compute_aggregate_stats(&params);
-        // all_today_cost = delta (50 - 10 = 40), budget = 100, pct = 40%
-        assert!((stats.daily_budget_pct.unwrap() - 40.0).abs() < 0.01);
+        // No prev-day baseline: full final cost ($50) counts. 50 / 100 = 50%.
+        assert!((stats.daily_budget_pct.unwrap() - 50.0).abs() < 0.01);
     }
 
     #[test]
@@ -838,16 +920,14 @@ mod tests {
         ];
         let params = make_params(&records, Some("aaa"), Some(5.0), Some(120_000), None, Some(500), None, Some("/foo"));
         let stats = compute_aggregate_stats(&params);
-        // project_today_cost: only /foo sessions' delta = cur_delta = 5.0 - 0.5 = 4.5
         assert!(
-            (stats.project_today_cost - 4.5).abs() < 0.01,
-            "project_today_cost was {} but expected 4.5",
+            (stats.project_today_cost - 5.0).abs() < 0.01,
+            "project_today_cost was {} but expected 5.0",
             stats.project_today_cost
         );
-        // all_today_cost: /bar delta (2.0 - 1.0 = 1.0) + cur_delta (4.5) = 5.5
         assert!(
-            (stats.all_today_cost - 5.5).abs() < 0.01,
-            "all_today_cost was {} but expected 5.5",
+            (stats.all_today_cost - 7.0).abs() < 0.01,
+            "all_today_cost was {} but expected 7.0",
             stats.all_today_cost
         );
     }
@@ -858,7 +938,21 @@ mod tests {
             record_with_session(1000, 3.0, "/proj", "aaa"),
             record_with_session(2000, 5.0, "/proj", "aaa"),
         ];
-        let params = make_params(&records, Some("aaa"), Some(5.0), None, None, None, Some(10.0), Some("/proj"));
+        // Session "aaa" carried over from yesterday at $3.
+        let mut prev_day = HashMap::new();
+        prev_day.insert("aaa".to_string(), 3.0);
+        let params = AggregateParams {
+            today_records: &records,
+            current_session_id: Some("aaa"),
+            current_cost: Some(5.0),
+            current_api_ms: None,
+            current_wall_ms: None,
+            current_out_tok: None,
+            budget_limit: Some(10.0),
+            current_project: Some("/proj"),
+            ctx_lookback_secs: LOOKBACK,
+            prev_day_session_costs: &prev_day,
+        };
         let stats = compute_aggregate_stats(&params);
         // all_today_cost = today's delta only = $5 - $3 = $2
         assert!(
@@ -884,17 +978,124 @@ mod tests {
         ];
         let params = make_params(&records, Some("aaa"), Some(3.0), None, None, None, None, Some("/bar"));
         let stats = compute_aggregate_stats(&params);
-        // project_today_cost: only /bar sessions' delta = 2.5 - 0.5 = 2.0 (current session not in /bar)
         assert!(
-            (stats.project_today_cost - 2.0).abs() < 0.01,
-            "project_today_cost was {} but expected 2.0",
+            (stats.project_today_cost - 2.5).abs() < 0.01,
+            "project_today_cost was {} but expected 2.5",
             stats.project_today_cost
         );
-        // all_today_cost: /bar delta (2.0) + cur_delta (3.0 - 1.0 = 2.0) = 4.0
         assert!(
-            (stats.all_today_cost - 4.0).abs() < 0.01,
-            "all_today_cost was {} but expected 4.0",
+            (stats.all_today_cost - 5.5).abs() < 0.01,
+            "all_today_cost was {} but expected 5.5",
             stats.all_today_cost
+        );
+    }
+
+    /// A session that started today and whose first observed record already
+    /// includes cost from its first turn (e.g. heavy initial reasoning) must
+    /// contribute its full final cost, not just the delta from the first
+    /// observation.
+    #[test]
+    fn session_started_today_with_nonzero_first_record() {
+        let records = vec![record_with_session(1000, 23.86, "/proj", "fresh")];
+        let params = make_params(
+            &records,
+            Some("fresh"),
+            Some(23.86),
+            None,
+            None,
+            None,
+            Some(100.0),
+            Some("/proj"),
+        );
+        let stats = compute_aggregate_stats(&params);
+        assert!(
+            (stats.all_today_cost - 23.86).abs() < 0.01,
+            "all_today_cost was {} but expected 23.86",
+            stats.all_today_cost
+        );
+        assert!((stats.daily_budget_pct.unwrap() - 23.86).abs() < 0.01);
+    }
+
+    /// A session continuing from yesterday should only contribute today's
+    /// added cost (current cost minus yesterday's final cost).
+    #[test]
+    fn session_continuing_from_yesterday_subtracts_baseline() {
+        let records = vec![
+            record_with_session(1000, 5.0, "/proj", "longrun"),
+            record_with_session(2000, 7.5, "/proj", "longrun"),
+        ];
+        let mut prev_day = HashMap::new();
+        prev_day.insert("longrun".to_string(), 5.0);
+        let params = AggregateParams {
+            today_records: &records,
+            current_session_id: Some("longrun"),
+            current_cost: Some(7.5),
+            current_api_ms: None,
+            current_wall_ms: None,
+            current_out_tok: None,
+            budget_limit: Some(10.0),
+            current_project: Some("/proj"),
+            ctx_lookback_secs: LOOKBACK,
+            prev_day_session_costs: &prev_day,
+        };
+        let stats = compute_aggregate_stats(&params);
+        assert!(
+            (stats.all_today_cost - 2.5).abs() < 0.01,
+            "all_today_cost was {} but expected 2.5",
+            stats.all_today_cost
+        );
+    }
+
+    /// Real-world data from issue: mix of fresh sessions, a yesterday-spanning
+    /// session, a re-attached session, and a single-turn session. Verifies
+    /// that the new logic produces the same total as a transcript-derived
+    /// reference value (~$79).
+    #[test]
+    fn realistic_mixed_today_session_set() {
+        // Sessions:
+        //  - "yest"  : carried from yesterday at 54.65, today rises to 80.60
+        //  - "first" : started today, first turn observed at 23.86 (no continuation)
+        //  - "fresh1": started today at 0, ends at 8.91
+        //  - "react" : re-attach of "fresh1" — first cost equals fresh1's last
+        //  - "small" : started today at 0, ends at 2.44
+        let records = vec![
+            record_with_session(1_000, 54.65, "/p", "yest"),
+            record_with_session(2_000, 80.60, "/p", "yest"),
+            record_with_session(3_000, 23.86, "/p", "first"),
+            record_with_session(4_000, 0.0, "/p", "fresh1"),
+            record_with_session(5_000, 8.91, "/p", "fresh1"),
+            record_with_session(6_000, 8.91, "/p", "react"),
+            record_with_session(7_000, 21.88, "/p", "react"),
+            record_with_session(8_000, 0.0, "/p", "small"),
+            record_with_session(9_000, 2.44, "/p", "small"),
+        ];
+        let mut prev_day = HashMap::new();
+        prev_day.insert("yest".to_string(), 54.65);
+        let params = AggregateParams {
+            today_records: &records,
+            current_session_id: Some("react"),
+            current_cost: Some(21.88),
+            current_api_ms: None,
+            current_wall_ms: None,
+            current_out_tok: None,
+            budget_limit: Some(100.0),
+            current_project: Some("/p"),
+            ctx_lookback_secs: LOOKBACK,
+            prev_day_session_costs: &prev_day,
+        };
+        let stats = compute_aggregate_stats(&params);
+        // yest: 80.60 - 54.65 = 25.95
+        // first: full 23.86 (no prev day, no re-attach match)
+        // fresh1: full 8.91
+        // react: 21.88 - 8.91 = 12.97 (re-attach detected)
+        // small: full 2.44
+        // total = 74.13
+        let expected = 25.95 + 23.86 + 8.91 + 12.97 + 2.44;
+        assert!(
+            (stats.all_today_cost - expected).abs() < 0.01,
+            "all_today_cost was {} but expected {}",
+            stats.all_today_cost,
+            expected
         );
     }
 
@@ -997,7 +1198,7 @@ mod tests {
             records: vec![&r1, &r2],
         };
         assert_eq!(s.final_cost(), 2.0);
-        assert_eq!(s.cost_delta(), 1.0);
+        assert_eq!(s.first_cost(), 1.0);
         assert_eq!(s.start_ts(), 1000);
         assert_eq!(s.model(), Some("Opus 4.6"));
         assert_eq!(s.project(), Some("/proj"));
@@ -1016,9 +1217,9 @@ mod tests {
             record_with_session(3000, 0.5, "/proj", "bbb"),
             record_with_session(4000, 2.5, "/proj", "bbb"),
         ];
-        // day: 1970-01-01, session aaa delta=2.0, session bbb delta=2.0, total=4.0, 1 day => avg=4.0
+        // No prev-day data: aaa contributes $3.0, bbb contributes $2.5.
         let avg = avg_daily_cost_from_records(&records).unwrap();
-        assert!((avg - 4.0).abs() < 0.01);
+        assert!((avg - 5.5).abs() < 0.01);
     }
 
     #[test]
@@ -1031,8 +1232,8 @@ mod tests {
             record_with_session(day2, 0.5, "/proj", "bbb"),
             record_with_session(day2 + 100, 1.5, "/proj", "bbb"),
         ];
-        // day1: delta=2.0, day2: delta=1.0, avg = 1.5
+        // day1: aaa=$3.0, day2: bbb=$1.5
         let avg = avg_daily_cost_from_records(&records).unwrap();
-        assert!((avg - 1.5).abs() < 0.01);
+        assert!((avg - 2.25).abs() < 0.01);
     }
 }

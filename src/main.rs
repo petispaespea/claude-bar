@@ -175,6 +175,7 @@ fn main() {
 
     let agg_stats = if config.stats.enabled {
         let today = stats::load_today_records(&config.stats.day_window);
+        let prev_day_costs = stats::load_prev_day_session_costs();
         let current_cost = input.cost.as_ref().and_then(|c| c.total_cost_usd);
         let current_api_ms = input.cost.as_ref().and_then(|c| c.total_api_duration_ms);
         let current_wall_ms = input.cost.as_ref().and_then(|c| c.total_duration_ms);
@@ -196,6 +197,7 @@ fn main() {
                 budget_limit,
                 current_project,
                 ctx_lookback_secs: config.ctx_trend.lookback_secs,
+                prev_day_session_costs: &prev_day_costs,
             },
         ))
         .map(|mut s| {
